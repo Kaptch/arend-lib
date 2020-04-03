@@ -1,0 +1,271 @@
+\import Function
+\import Logic
+\import Paths
+
+-- Попытка №1
+
+\module EX1 \where {
+  \class HomogeneousRelation {
+    | Carrier : \Set
+    | \infix 7 ~~> : Carrier -> Carrier -> \Prop
+  }
+
+  \func eval {A : \Set} : HomogeneousRelation A -> A -> A -> \Prop =>
+    \lam (r : HomogeneousRelation A) =>
+        \lam (x y : A) => x r.~~> y
+
+  \func isReflexive {A : \Set} (rel : HomogeneousRelation A) : \Prop =>
+    \Pi (x : A) -> x ~~> x
+
+  \func isSymmetric {A : \Set} (rel : HomogeneousRelation A) : \Prop =>
+    \Pi (x y : A) -> x ~~> y -> y ~~> x
+
+  \func isTransitive {A : \Set} (rel : HomogeneousRelation A) : \Prop =>
+    \Pi (x y z : A) -> x ~~> y -> y ~~> z -> x ~~> z
+
+  \func isDecidable {A B : \Set} (rel : HomogeneousRelation A) : \Prop =>
+    \Pi (x y : A) -> (x ~~> y) || (Not (x ~~> y))
+
+  \func preserves {A : \Set} (rel : HomogeneousRelation A) (f : A -> A)
+    : \Prop =>
+    \Pi (x y : A) -> x ~~> y -> (f x) ~~> y
+
+  \func isImplication {A : \Set} (rel1 : HomogeneousRelation A)
+                      (rel2 : HomogeneousRelation A) : \Prop =>
+    \Pi (x y : A) -> x rel1.~~> y -> x rel2.~~> y
+
+  \func \infix 6 ==> => isImplication
+
+  \func flip {A : \Set} (rel : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => \lam x y => flip' (~~>) x y
+    }
+    \where
+      \func flip' {A : \Set} : (A -> A -> \Prop) -> (A -> A -> \Prop) =>
+        \lam (r : A -> A -> \Prop) =>
+            \lam x y => r y x
+
+  \func composition {A : \Set} (rel1 : HomogeneousRelation A)
+                    (rel2 : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => \lam (x z : A) =>
+          TruncP (\Sigma (y : A) (Not (x rel1.~~> y) || Not (y rel2.~~> z)))
+    }
+
+  \func \infix 6 <> {A : \Set} (rel1 : HomogeneousRelation A)
+                    (rel2 : HomogeneousRelation A) : HomogeneousRelation A =>
+    composition rel1 rel2
+
+  \func idRelation (A : \Set) : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => \lam (x y : A) => x = y
+    }
+
+  \func union {A : \Set} (rel1 : HomogeneousRelation A)
+              (rel2 : HomogeneousRelation A) : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => \lam (x y : A) => x rel1.~~> y || x rel2.~~> y
+    }
+
+  \func \infix 5 >< {A : \Set} (rel1 : HomogeneousRelation A)
+                    (rel2 : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    union rel1 rel2
+
+  -- Полная форма любого замыкания может быть представлена как: (замыкание,
+  -- доказательство требуемого свойства для замыкания,
+  -- доказательство минимальности)
+  -- Например
+  -- \func REFLCLOSURE {A : \Set}
+  --                   (rel : HomogeneousRelation A)
+  --   : \Sigma (r : HomogeneousRelation A)
+  --            (isReflexive r)
+  --            (\Pi (a : HomogeneousRelation A) (isRelexive a -> r ==> a))
+
+  \func reflexiveClosure {A : \Set}
+                         (rel : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    rel >< (idRelation A)
+
+  \func reflexiveClosureIsReflexive {A : \Set}
+                                    (rel : HomogeneousRelation A)
+    : isReflexive (reflexiveClosure rel) =>
+    \lam (x : A) => byRight idp
+
+  \func symmetricClosure (rel : HomogeneousRelation) : HomogeneousRelation =>
+    rel >< (flip rel)
+
+  \func symmetricClosureIsSymmetric {A : \Set}
+                                    (rel : HomogeneousRelation A)
+    : isSymmetric (symmetricClosure rel) =>
+    \lam (x y : A) => ||.rec (Path.inProp {y ~~> x || x ~~> y})
+                             byRight
+                             byLeft
+
+  -- | TODO
+  \func transitiveClosure {A : \Set} (rel : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => {?}
+    }
+
+  \func transitiveClosureIsTransitive {A : \Set}
+                                      (rel : HomogeneousRelation A)
+    : isTransitive (transitiveClosure rel) => {?}
+
+  \func transitiveReflexiveClosure {A : \Set} (rel : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => {?}
+    }
+
+  \func transitiveReflexiveClosureIsTransitive {A : \Set}
+                                               (rel : HomogeneousRelation A)
+    : isTransitive (transitiveClosure rel) => {?}
+
+  \func transitiveReflexiveClosureIsReflexive {A : \Set}
+                                              (rel : HomogeneousRelation A)
+    : isTransitive (transitiveClosure rel) => {?}
+
+  \func transitiveSymmetricReflexiveClosure {A : \Set} (rel : HomogeneousRelation A)
+    : HomogeneousRelation A =>
+    \new HomogeneousRelation A {
+      | ~~> => {?}
+    }
+
+  --- Klop definitions
+
+  \func isNormalForm {A : \Set} (rule : HomogeneousRelation A)
+    : A -> \Prop => \lam (x : A) =>
+      Not (\Sigma (y : A) (x ~~> y))
+
+  \func hasNormalForm {A : \Set} (rule : HomogeneousRelation A)
+    : A -> \Prop => \lam (y : A) =>
+      TruncP (\Sigma (x : A) (isNormalForm rule x) (eval (transitiveReflexiveClosure rule) y x))
+
+  \func normalForm {A : \Set} (rule : HomogeneousRelation A)
+    : A -> \Prop => \lam (x : A) => {?}
+}
+
+-- Попытка #2
+
+\module EX2 \where {
+  \func REL (A : \Set) : \Type => A -> A -> \Prop
+
+  \func isRefl {A : \Set} (r : REL A) : \Prop =>
+    \Pi (x : A) -> r x x
+
+  \func isSymm {A : \Set} (r : REL A) : \Prop =>
+    \Pi (x y : A) -> r x y -> r y x
+
+  \func isTrans {A : \Set} (r : REL A) : \Prop =>
+    \Pi (x y z : A) -> r x y -> r y z -> r x z
+
+  \func flip {A : \Set} (r : REL A) : REL A =>
+    \lam (x y : A) => r y x
+
+  \func implies {A : \Set} (r : REL A) (p : REL A) : \Prop =>
+    \Pi (x y : A) -> r x y -> p x y
+
+  \func union {A : \Set} (rel1 : REL A)
+              (rel2 : REL A) : REL A =>
+    \lam (x y : A) => rel1 x y || rel2 x y
+
+  \func idREL {A : \Set} : REL A => \lam (x y : A) => x = y
+
+  \func closure {A : \Set}
+                (initRel : REL A)
+                (prop : REL A -> \Prop)
+                (build : REL A -> REL A) : \Type =>
+    \Sigma (newRel : REL A)
+           (prop newRel)
+           (p : newRel = build initRel)
+           (\Pi (p : REL A) ->
+               implies initRel p ->
+               prop p ->
+               implies newRel p)
+
+  \func reflClosure {A : \Set} (rel : REL A)
+    : closure rel isRefl buildReflClosure =>
+    (buildReflClosure rel,
+     \lam _ => byRight idp,
+     idp,
+     \lam (p : REL A) =>
+         \lam (o : implies rel p) =>
+             \lam (proof : isRefl p) =>
+                 \lam x y =>
+                     \lam q => \case q \with {
+                       | byLeft (t1 : rel x y) => o x y t1
+                       | byRight (t2 : x = y) => coe2 (@ (pmap2 p idp t2))
+                                                      left
+                                                      (proof x)
+                                                      right
+                     })
+    \where
+      \func buildReflClosure {A : \Set} (r : REL A) : REL A => union r idREL
+
+  \func symmClosure {A : \Set} (rel : REL A)
+    : closure rel isSymm buildSymmClosure =>
+    (buildSymmClosure rel,
+     \lam (x y : A) => ||.rec Path.inProp
+                              byRight
+                              byLeft,
+     idp,
+     \lam (p : REL A) =>
+         \lam (o : implies rel p) =>
+             \lam (proof : isSymm p) =>
+                 \lam x y =>
+                     \lam q => \case q \with {
+                       | byLeft (t1 : rel x y) => o x y t1
+                       | byRight (t2 : rel y x) => proof y x (o y x t2)
+                     })
+    \where
+      \func buildSymmClosure {A : \Set} (r : REL A) : REL A => union r (flip r)
+
+  \func composition {A : \Set} (r : REL A) (p : REL A) : REL A =>
+    \lam (x z : A) =>
+        TruncP (\Sigma (y : A) (r x y) (r y z))
+
+  \func step {A : \Set} (r : REL A) : REL A => composition r r
+
+  -- | TODO
+  -- \func tranClosure' {A : \Set} (r : REL A) : REL A => union' r (union' (step' r) (tranClosure' r))
+
+  \func transClosure {A : \Set} (rel : REL A)
+    : closure rel isTrans buildTransClosure => {?}
+    \where
+      \func buildTransClosure {A : \Set} (r : REL A) : REL A => {?}
+
+  \func \infixr 9 && (A B : \Prop) : \Prop => \Sigma A B
+
+  \func transReflClosure {A : \Set} (rel : REL A)
+    : closure rel
+              (\lam (x : REL A) => (isTrans x && isRefl x))
+              buildTransReflClosure => {?}
+    \where
+      \func buildTransReflClosure {A : \Set} (r : REL A) : REL A => {?}
+
+  \func isNormalForm {A : \Set} (rule : REL A)
+    : A -> \Prop => \lam (x : A) => Not (\Sigma (y : A) (rule x y))
+
+  \func hasNormalForm {A : \Set} (rule : REL A) : A -> \Prop =>
+    \lam (x : A) =>
+      \let | rule* : REL A => (transReflClosure rule).1
+        \in TruncP (\Sigma (y : A) (rule* x y) (isNormalForm rule y))
+
+  \func weaklyConfluent {A : \Set} (rule : REL A) : A -> \Prop =>
+    \let | rule* : REL A => (transReflClosure rule).1
+      \in \lam (x : A) =>
+        TruncP (\Pi (y z : A) ->
+            (rule x y && rule x z) ->
+            \Sigma (t : A) (rule* y t && rule* z t))
+
+  \func confluent {A : \Set} (rule : REL A) : A -> \Prop =>
+    \let | rule* : REL A => (transReflClosure rule).1
+    \in \lam (x : A) =>
+        TruncP (\Pi (y z : A) ->
+            (rule x y && rule x z) ->
+            \Sigma (t : A) (rule* y t && (rule z t || (z = t))))
+}
