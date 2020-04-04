@@ -278,4 +278,22 @@
         TruncP (\Pi (y z : A) ->
             (rule x y && rule x z) ->
             \Sigma (t : A) (rule* y t && (rule z t || (z = t))))
+
+  -- Lemma 10.3.2 smh is proved by Arend (accessibility is a mere property)
+  \data acc {A : \Set} (rel : REL A) (a : A) : \Prop
+    | accREL (f : \Pi (b : A) -> (rel b a) -> acc rel b)
+    \where
+      \func ind {A : \Set} (rel : REL A) (a : A)
+                (P : \Pi (a : A) -> (acc rel a -> \Type))
+                (f : \Pi (a : A) ->
+                    \Pi (h : \Pi (b : A) -> (rel b a) -> acc rel b) ->
+                        (\Pi (b : A) -> \Pi (l : rel b a) -> P b (h b l)) ->
+                        P a (accREL h : acc rel a))
+                (b : A)
+                (c : acc rel b)
+        : P b c
+        | rel', _, P', f', b', (accREL h') =>
+          f' b' h' (\lam b => \lam l => ind rel' b' P' f' b (h' b l))
+
+  \func wellFounded {A : \Set} (rel : REL A) : \Prop => \Pi (x : A) -> acc rel x
 }
