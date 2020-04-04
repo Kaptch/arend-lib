@@ -190,13 +190,12 @@
     \Sigma (newRel : REL A) -- Само замыкание
            (prop newRel) -- Доказательство того, что замыкание удовлетворяет свойству
            (p : newRel = build initRel) -- Доказательство того, что замыкание построено с помощью build (наверное, можно заменить newRel на build rel и избавиться от этого поля)
-           (\Pi (p : REL A) ->
+           (\Pi (p : REL A) -> -- Доказательство того, что для любого расширения исходного отношения, обладающего требуемым св-ом, newRel лежит в этом расширении
                implies initRel p ->
                prop p ->
                implies newRel p)
 
-  -- Доказательство того, что для любого расширения исходного отношения, обладающего требуемым св-ом, newRel лежит в этом расширении
-
+  -- Рефлексивное замыкание
   \func reflClosure {A : \Set} (rel : REL A)
     : closure rel isRefl buildReflClosure =>
     (buildReflClosure rel,
@@ -216,6 +215,8 @@
     \where
       \func buildReflClosure {A : \Set} (r : REL A) : REL A => union r idREL
 
+  -- Симметричное замыкание
+
   \func symmClosure {A : \Set} (rel : REL A)
     : closure rel isSymm buildSymmClosure =>
     (buildSymmClosure rel,
@@ -234,52 +235,8 @@
     \where
       \func buildSymmClosure {A : \Set} (r : REL A) : REL A => union r (flip r)
 
-  \func composition {A : \Set} (r : REL A) (p : REL A) : REL A =>
-    \lam (x z : A) =>
-        TruncP (\Sigma (y : A) (r x y) (r y z))
-
-  \func step {A : \Set} (r : REL A) : REL A => composition r r
-
-  -- | TODO
-  -- \func tranClosure' {A : \Set} (r : REL A) : REL A => union' r (union' (step' r) (tranClosure' r))
-
-  \func transClosure {A : \Set} (rel : REL A)
-    : closure rel isTrans buildTransClosure => {?}
-    \where
-      \func buildTransClosure {A : \Set} (r : REL A) : REL A => {?}
-
-  \func \infixr 9 && (A B : \Prop) : \Prop => \Sigma A B
-
-  \func transReflClosure {A : \Set} (rel : REL A)
-    : closure rel
-              (\lam (x : REL A) => (isTrans x && isRefl x))
-              buildTransReflClosure => {?}
-    \where
-      \func buildTransReflClosure {A : \Set} (r : REL A) : REL A => {?}
-
-  \func isNormalForm {A : \Set} (rule : REL A)
-    : A -> \Prop => \lam (x : A) => Not (\Sigma (y : A) (rule x y))
-
-  \func hasNormalForm {A : \Set} (rule : REL A) : A -> \Prop =>
-    \lam (x : A) =>
-        \let | rule* : REL A => (transReflClosure rule).1
-        \in TruncP (\Sigma (y : A) (rule* x y) (isNormalForm rule y))
-
-  \func weaklyConfluent {A : \Set} (rule : REL A) : A -> \Prop =>
-    \let | rule* : REL A => (transReflClosure rule).1
-    \in \lam (x : A) =>
-        TruncP (\Pi (y z : A) ->
-            (rule x y && rule x z) ->
-            \Sigma (t : A) (rule* y t && rule* z t))
-
-  \func confluent {A : \Set} (rule : REL A) : A -> \Prop =>
-    \let | rule* : REL A => (transReflClosure rule).1
-    \in \lam (x : A) =>
-        TruncP (\Pi (y z : A) ->
-            (rule x y && rule x z) ->
-            \Sigma (t : A) (rule* y t && (rule z t || (z = t))))
-
   -- Lemma 10.3.2 smh is proved by Arend (accessibility is a mere property)
+
   \data acc {A : \Set} (rel : REL A) (a : A) : \Prop
     | accREL (f : \Pi (b : A) -> (rel b a) -> acc rel b)
     \where
@@ -295,5 +252,73 @@
         | rel', _, P', f', b', (accREL h') =>
           f' b' h' (\lam b => \lam l => ind rel' b' P' f' b (h' b l))
 
-  \func wellFounded {A : \Set} (rel : REL A) : \Prop => \Pi (x : A) -> acc rel x
+  \func wellFounded {A : \Set} (rel : REL A) : \Prop =>
+    \Pi (x : A) -> acc rel x
+
+  -- Тип для индуктивного определения транзитивного замыкания
+
+  \truncated \data TransClosure {A : \Set} (rel : REL A) (a b : A) : \Prop
+    | base (r : rel a b)
+    | trans (x : A) (t : (TransClosure rel) a x) (r : (TransClosure rel) x b)
+    \where
+      \func downwardsClosed {A : \Set}
+                            (rel : REL A)
+                            (x y : A)
+                            (a : acc (TransClosure rel) y)
+                            (t : TransClosure rel x y) : acc (TransClosure rel) x
+        | rel, x, y, (accREL h), r =>
+          accREL (\lam z =>
+              \lam t =>
+                  accREL (\lam b =>
+                      \lam (p : TransClosure rel b z) =>
+                          h b (trans x (trans z p t) r)))
+
+  \func transClosure {A : \Set} (rel : REL A)
+    : closure rel isTrans buildTransClosure =>
+    (buildTransClosure rel,
+     \lam x y z => \lam r => \lam q => trans y r q,
+     idp,
+     \lam (p : REL A) =>
+         \lam (i1 : implies rel p) => -- implies rel p == \Pi (x y : A) -> rel x y -> p x y
+             \lam (transPr : isTrans p) => -- isTrans p == \Pi (x y z : A) -> p x y -> p y z -> p x z
+                 \lam (x y : A) =>
+                     \lam (t : TransClosure rel x y) => {?}) -- TODO: ?exploit downwardsClosed?
+    \where
+      \func buildTransClosure {A : \Set} (r : REL A) : REL A => TransClosure r
+
+  \func transReflClosure {A : \Set} (rel : REL A)
+    : closure rel
+              {?}
+              buildTransReflClosure =>
+    (buildTransReflClosure rel, {?}, idp, {?})
+    \where
+      \func buildTransReflClosure {A : \Set} (r : REL A) : REL A => (reflClosure (TransClosure r)).1
+
+  \func stronglyNormalizing {A : \Set} (rule : REL A) : \Prop =>
+    wellFounded rule
+
+  \func isNormalForm {A : \Set} (rule : REL A)
+    : A -> \Prop => \lam (x : A) => Not (\Sigma (y : A) (rule x y))
+
+  \func hasNormalForm {A : \Set} (rule : REL A) : A -> \Prop =>
+    \lam (x : A) =>
+        \let | rule* : REL A => (transReflClosure rule).1
+        \in TruncP (\Sigma (y : A) (rule* x y) (isNormalForm rule y))
+
+  \func weaklyNormalizing {A : \Set} (rule : REL A) : \Prop =>
+    \Pi (x : A) -> hasNormalForm rule x
+
+  \func weaklyConfluent {A : \Set} (rule : REL A) : A -> \Prop =>
+    \let | rule* : REL A => (transReflClosure rule).1
+    \in \lam (x : A) =>
+        TruncP (\Pi (y z : A) ->
+            \Sigma (rule x y) (rule x z) ->
+            \Sigma (t : A) (rule* y t) (rule* z t))
+
+  \func confluent {A : \Set} (rule : REL A) : A -> \Prop =>
+    \let | rule* : REL A => (transReflClosure rule).1
+    \in \lam (x : A) =>
+        TruncP (\Pi (y z : A) ->
+            \Sigma (rule x y) (rule x z) ->
+            \Sigma (t : A) (rule* y t) ((rule z t || (z = t))))
 }
