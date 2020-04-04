@@ -154,6 +154,8 @@
 \module EX2 \where {
   \func REL (A : \Set) : \Type => A -> A -> \Prop
 
+  -- Свойства бинарных отношений
+
   \func isRefl {A : \Set} (r : REL A) : \Prop =>
     \Pi (x : A) -> r x x
 
@@ -166,8 +168,12 @@
   \func flip {A : \Set} (r : REL A) : REL A =>
     \lam (x y : A) => r y x
 
+  -- Вложение
+
   \func implies {A : \Set} (r : REL A) (p : REL A) : \Prop =>
     \Pi (x y : A) -> r x y -> p x y
+
+  -- Объединение
 
   \func union {A : \Set} (rel1 : REL A)
               (rel2 : REL A) : REL A =>
@@ -175,17 +181,21 @@
 
   \func idREL {A : \Set} : REL A => \lam (x y : A) => x = y
 
+  -- Тип замыкания отношения
+
   \func closure {A : \Set}
                 (initRel : REL A)
                 (prop : REL A -> \Prop)
                 (build : REL A -> REL A) : \Type =>
-    \Sigma (newRel : REL A)
-           (prop newRel)
-           (p : newRel = build initRel)
+    \Sigma (newRel : REL A) -- Само замыкание
+           (prop newRel) -- Доказательство того, что замыкание удовлетворяет свойству
+           (p : newRel = build initRel) -- Доказательство того, что замыкание построено с помощью build (наверное, можно заменить newRel на build rel и избавиться от этого поля)
            (\Pi (p : REL A) ->
                implies initRel p ->
                prop p ->
                implies newRel p)
+
+  -- Доказательство того, что для любого расширения исходного отношения, обладающего требуемым св-ом, newRel лежит в этом расширении
 
   \func reflClosure {A : \Set} (rel : REL A)
     : closure rel isRefl buildReflClosure =>
@@ -252,12 +262,12 @@
 
   \func hasNormalForm {A : \Set} (rule : REL A) : A -> \Prop =>
     \lam (x : A) =>
-      \let | rule* : REL A => (transReflClosure rule).1
+        \let | rule* : REL A => (transReflClosure rule).1
         \in TruncP (\Sigma (y : A) (rule* x y) (isNormalForm rule y))
 
   \func weaklyConfluent {A : \Set} (rule : REL A) : A -> \Prop =>
     \let | rule* : REL A => (transReflClosure rule).1
-      \in \lam (x : A) =>
+    \in \lam (x : A) =>
         TruncP (\Pi (y z : A) ->
             (rule x y && rule x z) ->
             \Sigma (t : A) (rule* y t && rule* z t))
