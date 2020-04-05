@@ -198,8 +198,8 @@
   -- Рефлексивное замыкание
 
   \func reflClosure {A : \Set} (rel : REL A)
-    : closure rel isRefl buildReflClosure =>
-    (buildReflClosure rel,
+    : closure rel isRefl _buildReflClosure =>
+    (_buildReflClosure rel,
      \lam _ => byRight idp,
      idp,
      \lam (p : REL A) =>
@@ -214,13 +214,13 @@
                                                       right
                      })
     \where
-      \func buildReflClosure {A : \Set} (r : REL A) : REL A => union r idREL
+      \func _buildReflClosure {A : \Set} (r : REL A) : REL A => union r idREL
 
   -- Симметричное замыкание
 
   \func symmClosure {A : \Set} (rel : REL A)
-    : closure rel isSymm buildSymmClosure =>
-    (buildSymmClosure rel,
+    : closure rel isSymm _buildSymmClosure =>
+    (_buildSymmClosure rel,
      \lam (x y : A) => ||.rec Path.inProp
                               byRight
                               byLeft,
@@ -234,7 +234,8 @@
                        | byRight (t2 : rel y x) => proof y x (o y x t2)
                      })
     \where
-      \func buildSymmClosure {A : \Set} (r : REL A) : REL A => union r (flip r)
+      \func _buildSymmClosure {A : \Set} (r : REL A) : REL A =>
+        union r (flip r)
 
   -- Lemma 10.3.2 smh is proved by Arend (accessibility is a mere property)
 
@@ -266,7 +267,8 @@
                             (rel : REL A)
                             (x y : A)
                             (a : acc (TransClosure rel) y)
-                            (t : TransClosure rel x y) : acc (TransClosure rel) x
+                            (t : TransClosure rel x y)
+        : acc (TransClosure rel) x
         | rel, x, y, (accREL h), r =>
           accREL (\lam z =>
               \lam t =>
@@ -275,19 +277,20 @@
                           h b (trans x (trans z p t) r)))
 
   \func transClosure {A : \Set} (rel : REL A)
-    : closure rel isTrans buildTransClosure =>
-    (buildTransClosure rel,
+    : closure rel isTrans _buildTransClosure =>
+    (_buildTransClosure rel,
      \lam x y z => \lam r => \lam q => trans y r q,
      idp,
      \lam (p : REL A) =>
          \lam (i1 : implies rel p) =>
              \lam (transPr : isTrans p) =>
                  \lam (x y : A) =>
-                     \lam (t : TransClosure rel x y) => _isTrans rel p i1 transPr x y t)
+                     \lam (t : TransClosure rel x y) =>
+                         _implies rel p i1 transPr x y t)
     \where {
-      \func buildTransClosure {A : \Set} (r : REL A) : REL A => TransClosure r
+      \func _buildTransClosure {A : \Set} (r : REL A) : REL A => TransClosure r
 
-      \func _isTrans {A : \Set}
+      \func _implies {A : \Set}
                      (rel : REL A)
                      (p : REL A)
                      (i1 : implies rel p)
@@ -297,17 +300,60 @@
         | rel, p, i1, transPr, x, y, base r => i1 x y r
         | rel, p, i1, transPr, x, y, trans x1 t1 r1 =>
           transPr x x1 y
-                  (_isTrans rel p i1 transPr x x1 t1)
-                  (_isTrans rel p i1 transPr x1 y r1)
+                  (_implies rel p i1 transPr x x1 t1)
+                  (_implies rel p i1 transPr x1 y r1)
     }
 
   \func transReflClosure {A : \Set} (rel : REL A)
     : closure rel
-              {?}
-              buildTransReflClosure =>
-    (buildTransReflClosure rel, {?}, idp, {?})
-    \where
-      \func buildTransReflClosure {A : \Set} (r : REL A) : REL A => (reflClosure (TransClosure r)).1
+              (\lam (r : REL A) => (isTrans r && isRefl r))
+              _buildTransReflClosure =>
+    (_buildTransReflClosure rel,
+     prod (_isTrans rel) (_isRefl rel),
+     idp,
+     \lam (p : REL A) =>
+         \lam (i1 : implies rel p) =>
+             \lam (pr : isTrans p && isRefl p) => _implies rel p i1 pr)
+    \where {
+      \func _buildTransReflClosure {A : \Set} (r : REL A) : REL A =>
+        (reflClosure (TransClosure r)).1
+
+      \func _isTrans {A : \Set} (r : REL A) (x y z : A)
+                     (p : TransClosure r x y || (x = y))
+                     (t : TransClosure r y z || (y = z))
+        : TransClosure r x z || (x = z)
+        | r, a, b, c, byRight b1, byRight b2 => byRight
+            (b1 *> b2)
+        | r, a, b, c, byLeft b1, byRight b2 => byLeft
+            (transport (\lam v => TransClosure r a v) b2 b1)
+        | r, a, b, c, byRight b1, byLeft b2 => byLeft
+            (transport (\lam v => TransClosure r v c) (inv b1) b2)
+        | r, a, b, c, byLeft b1, byLeft b2 => byLeft
+            (trans b b1 b2)
+
+      \func _isRefl {A : \Set} (r : REL A)
+        : \Pi (x : A) -> (_buildTransReflClosure r) x x =>
+        \lam (a : A) => byRight idp
+
+      \func _implies {A : \Set}
+                     (rel : REL A)
+                     (p : REL A)
+                     (i1 : implies rel p)
+                     (pr : isTrans p && isRefl p)
+                     (x y : A)
+                     (t : (reflClosure (TransClosure rel)).1 x y) : p x y
+        | rel, p, i1, prod a b, x, y, byLeft a1 => \case a1 \with {
+          | base r' => i1 x y r'
+          | trans x' t' r' => a x x' y
+                                (transClosure._implies rel p i1 a x x' t')
+                                (transClosure._implies rel p i1 a x' y r')
+        }
+        | rel, p, i1, prod a b, x, y, byRight b1 => coe2
+            (@ (pmap2 p idp b1))
+            left
+            (b x)
+            right
+    }
 
   \func stronglyNormalizing {A : \Set} (rule : REL A) : \Prop =>
     wellFounded rule
