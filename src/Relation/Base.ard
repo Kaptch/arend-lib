@@ -196,6 +196,7 @@
                implies newRel p)
 
   -- Рефлексивное замыкание
+
   \func reflClosure {A : \Set} (rel : REL A)
     : closure rel isRefl buildReflClosure =>
     (buildReflClosure rel,
@@ -279,12 +280,26 @@
      \lam x y z => \lam r => \lam q => trans y r q,
      idp,
      \lam (p : REL A) =>
-         \lam (i1 : implies rel p) => -- implies rel p == \Pi (x y : A) -> rel x y -> p x y
-             \lam (transPr : isTrans p) => -- isTrans p == \Pi (x y z : A) -> p x y -> p y z -> p x z
+         \lam (i1 : implies rel p) =>
+             \lam (transPr : isTrans p) =>
                  \lam (x y : A) =>
-                     \lam (t : TransClosure rel x y) => {?}) -- TODO: ?exploit downwardsClosed?
-    \where
+                     \lam (t : TransClosure rel x y) => _isTrans rel p i1 transPr x y t)
+    \where {
       \func buildTransClosure {A : \Set} (r : REL A) : REL A => TransClosure r
+
+      \func _isTrans {A : \Set}
+                     (rel : REL A)
+                     (p : REL A)
+                     (i1 : implies rel p)
+                     (transPr : isTrans p)
+                     (x y : A)
+                     (t : TransClosure rel x y) : p x y
+        | rel, p, i1, transPr, x, y, base r => i1 x y r
+        | rel, p, i1, transPr, x, y, trans x1 t1 r1 =>
+          transPr x x1 y
+                  (_isTrans rel p i1 transPr x x1 t1)
+                  (_isTrans rel p i1 transPr x1 y r1)
+    }
 
   \func transReflClosure {A : \Set} (rel : REL A)
     : closure rel
