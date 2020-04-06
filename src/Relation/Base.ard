@@ -343,16 +343,16 @@
 
   \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : REL A)
                                                         (pr1 : stronglyNormalizing rule)
-                                                        (pr2 : confluent rule)
-    : weaklyConfluent rule =>
+                                                        (pr2 : weaklyConfluent rule)
+    : confluent rule =>
     _help1 A rule pr1 pr2
     \where {
       \func _help1 (A : \Set) (rule : REL A)
                    (pr1 : stronglyNormalizing rule)
-                   (pr2 : confluent rule) : weaklyConfluent rule
+                   (pr2 : weaklyConfluent rule) : confluent rule
         | A, rule, p1, p2 => \lam (x : A) =>
             inP (\lam (y z : A) =>
-                \lam (l : \Sigma (rule x y) (rule x z)) => {?})
+                \lam (t1 : \Sigma (TransClosure rule x y || (x = y)) (TransClosure rule x z || (x = z))) => {?})
 
       -- stronglyNormalizing {A} rule === wellFounded rule === \Pi (x : A) -> acc rule x
       -- accREL (f : \Pi (b : A) -> (rel b a) -> acc rel b)
