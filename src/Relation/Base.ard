@@ -351,4 +351,14 @@
                                                (a y z p)
         | A, rule, x, y, z, truncP a a' i, p => _help2 A rule x y z a p
     }
+
+  \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : REL A)
+    (pr : (stronglyNormalizing rule) && (confluent rule)) : weaklyConfluent rule => _help1 A rule pr
+      \where {
+        \func _help1 (A : \Set) (rule : REL A)
+                     (pr : (stronglyNormalizing rule) && (confluent rule)) : weaklyConfluent rule
+          | A, rule, prod p1 p2 => \lam (x : A) =>
+              inP (\lam (y z : A) =>
+                  \lam (t : \Sigma (rule x y) (rule x z)) => {?})
+      }
 }
