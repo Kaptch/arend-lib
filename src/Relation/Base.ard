@@ -263,8 +263,8 @@
           | byLeft a' => \case a' \with {
             | base r' => i1 x y r'
             | trans x' t' r' => p1 x x' y
-                                  (transClosure._implies rel p i1 p1 x x' t')
-                                  (transClosure._implies rel p i1 p1 x' y r')
+                                   (transClosure._implies rel p i1 p1 x x' t')
+                                   (transClosure._implies rel p i1 p1 x' y r')
           }
           | byRight b' => coe2
               (@ (pmap2 p idp b'))
@@ -353,12 +353,14 @@
     }
 
   \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : REL A)
-    (pr : (stronglyNormalizing rule) && (confluent rule)) : weaklyConfluent rule => _help1 A rule pr
-      \where {
-        \func _help1 (A : \Set) (rule : REL A)
-                     (pr : (stronglyNormalizing rule) && (confluent rule)) : weaklyConfluent rule
-          | A, rule, prod p1 p2 => \lam (x : A) =>
-              inP (\lam (y z : A) =>
-                  \lam (t : \Sigma (rule x y) (rule x z)) => {?})
-      }
+                                                        (pr : (stronglyNormalizing rule) && (confluent rule))
+    : weaklyConfluent rule =>
+    _help1 A rule pr
+    \where {
+      \func _help1 (A : \Set) (rule : REL A)
+                   (pr : (stronglyNormalizing rule) && (confluent rule)) : weaklyConfluent rule
+        | A, rule, prod p1 p2 => \lam (x : A) =>
+            inP (\lam (y z : A) =>
+                \lam (t : \Sigma (rule x y) (rule x z)) => {?})
+    }
 }
