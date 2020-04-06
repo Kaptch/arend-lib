@@ -1,6 +1,7 @@
 \import Function
 \import Logic
 \import Paths
+\import Data.Sigma
 
 \module Relation \where {
   \func REL (A : \Set) : \Type => A -> A -> \Prop
@@ -317,8 +318,8 @@
     \let | rule* : REL A => (transReflClosure rule).1
     \in \Pi (x : A) ->
         TruncP (\Pi (y z : A) ->
-            \Sigma (rule x y) (rule x z) ->
-            \Sigma (t : A) (rule* y t) ((rule z t || (z = t))))
+            \Sigma (rule* x y) (rule* x z) ->
+            \Sigma (t : A) (rule* y t) (rule* z t))
 
   \func confluent->weaklyConfluent {A : \Set} (rule : REL A)
     : confluent rule -> weaklyConfluent rule =>
@@ -327,6 +328,8 @@
             inP (\lam (y z : A) =>
                 \lam (p : \Sigma (rule x y) (rule x z)) => _help2 A rule x y z (c x) p)
     \where {
+      \func rule* {A : \Set} (rule : REL A) : REL A => (transReflClosure rule).1
+
       \func _help1 {A : \Type}
                    {B C D : A -> \Type}
                    (f : \Pi (a : A) -> (C a) -> (D a))
@@ -339,16 +342,11 @@
         (rule : REL A)
         (x y z : A)
         (t : TruncP (\Pi (y z : A) ->
-            \Sigma (rule x y) (rule x z) ->
-            \Sigma (t : A) ((transReflClosure rule).1 y t) ((rule z t || (z = t)))))
+            \Sigma (rule* rule x y) (rule* rule x z) ->
+            \Sigma (t : A) (rule* rule y t) (rule* rule z t)))
         (p : \Sigma (rule x y) (rule x z))
-        : \Sigma (t : A) ((transReflClosure rule).1 y t) ((transReflClosure rule).1 z t)
-        | A, rule, x, y, z, inP a, p => _help1 {A}
-                                               {\lam t => TransClosure rule y t || (y = t)}
-                                               {\lam t => rule z t || (z = t)}
-                                               {\lam t => TransClosure rule z t || (z = t)}
-                                               (\lam (t : A) => \lam u => ||.map base id u)
-                                               (a y z p)
+        : \Sigma (t : A) (rule* rule y t) (rule* rule z t)
+        | A, rule, x, y, z, inP a, p => a y z (tupleMap (byLeft o base) (byLeft o base) p)
         | A, rule, x, y, z, truncP a a' i, p => _help2 A rule x y z a p
     }
 
