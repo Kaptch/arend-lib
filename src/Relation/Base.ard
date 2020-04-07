@@ -284,90 +284,131 @@
 \module ARS \where {
   \open Relation
 
-  \func stronglyNormalizing {A : \Set} (rule : REL A) : \Prop =>
+  \func rule* {A : \Set}
+              (rule : REL A)
+    : REL A =>
+    (transReflClosure rule).1
+
+  \func rule+ {A : \Set}
+              (rule : REL A)
+    : REL A =>
+    (transClosure rule).1
+
+  \func stronglyNormalizing {A : \Set}
+                            (rule : REL A)
+    : \Prop =>
     wellFounded rule
 
-  \func isNormalForm {A : \Set} (rule : REL A)
-    : A -> \Prop => \lam (x : A) => Not (\Sigma (y : A) (rule x y))
-
-  \func hasNormalForm {A : \Set} (rule : REL A) : A -> \Prop =>
+  \func isNormalForm {A : \Set}
+                     (rule : REL A)
+    : A -> \Prop =>
     \lam (x : A) =>
-        \let | rule* : REL A => (transReflClosure rule).1
-        \in TruncP (\Sigma (y : A) (rule* x y) (isNormalForm rule y))
+        Not (\Sigma (y : A)
+                    (rule x y))
 
-  \func weaklyNormalizing {A : \Set} (rule : REL A) : \Prop =>
+  \func hasNormalForm {A : \Set}
+                      (rule : REL A)
+    : A -> \Prop =>
+    \lam (x : A) =>
+        TruncP (\Sigma (y : A)
+                       (rule* rule x y)
+                       (isNormalForm rule y))
+
+  \func weaklyNormalizing {A : \Set}
+                          (rule : REL A)
+    : \Prop =>
     \Pi (x : A) -> hasNormalForm rule x
 
-  \func weaklyConfluent {A : \Set} (rule : REL A) : \Prop =>
-    \let | rule* : REL A => (transReflClosure rule).1
-    \in \Pi (x : A) ->
-        TruncP (\Pi (y z : A) ->
+  \func weaklyConfluent {A : \Set}
+                        (rule : REL A)
+    : \Prop =>
+    \Pi (x : A) ->
+        \Pi (y z : A) ->
             \Sigma (rule x y) (rule x z) ->
-            \Sigma (t : A) (rule* y t) (rule* z t))
+            TruncP (\Sigma (t : A)
+                           (rule* rule y t)
+                           (rule* rule z t))
 
-  \func confluent {A : \Set} (rule : REL A) : \Prop =>
-    \let | rule* : REL A => (transReflClosure rule).1
-    \in \Pi (x : A) ->
-        TruncP (\Pi (y z : A) ->
-            \Sigma (rule* x y) (rule* x z) ->
-            \Sigma (t : A) (rule* y t) (rule* z t))
+  \func confluent {A : \Set}
+                  (rule : REL A) : \Prop =>
+    \Pi (x : A) ->
+        \Pi (y z : A) ->
+            \Sigma (rule* rule x y) (rule* rule x z) ->
+            TruncP (\Sigma (t : A)
+                           (rule* rule y t)
+                           (rule* rule z t))
 
-  \func confluent->weaklyConfluent {A : \Set} (rule : REL A)
+  \func confluent->weaklyConfluent {A : \Set}
+                                   (rule : REL A)
     : confluent rule -> weaklyConfluent rule =>
     \lam (c : confluent rule) =>
         \lam (x : A) =>
-            inP (\lam (y z : A) =>
-                \lam (p : \Sigma (rule x y) (rule x z)) => _help2 A rule x y z (c x) p)
+            \lam (y z : A) =>
+                \lam (p : \Sigma (rule x y) (rule x z)) =>
+                    (_help2 A rule x y z c p)
     \where {
-      \func rule* {A : \Set} (rule : REL A) : REL A => (transReflClosure rule).1
-
       \func _help1 {A : \Type}
                    {B C D : A -> \Type}
                    (f : \Pi (a : A) -> (C a) -> (D a))
                    (p : \Sigma (a : A) (B a) (C a))
-        : \Sigma (a : A) (B a) (D a) \elim p
+        : \Sigma (a : A)
+                 (B a)
+                 (D a) \elim p
         | (a, b, c) => (a, b, f a c)
 
-      \sfunc _help2
-        (A : \Set)
-        (rule : REL A)
-        (x y z : A)
-        (t : TruncP (\Pi (y z : A) ->
-            \Sigma (rule* rule x y) (rule* rule x z) ->
-            \Sigma (t : A) (rule* rule y t) (rule* rule z t)))
-        (p : \Sigma (rule x y) (rule x z))
-        : \Sigma (t : A) (rule* rule y t) (rule* rule z t)
-        | A, rule, x, y, z, inP a, p => a y z (tupleMap (byLeft o base) (byLeft o base) p)
-        | A, rule, x, y, z, truncP a a' i, p => _help2 A rule x y z a p
+      \func _help2 (A : \Set)
+                   (rule : REL A)
+                   (x y z : A)
+                   (t : \Pi (x : A) -> \Pi (y z : A) ->
+                       \Sigma (rule* rule x y) (rule* rule x z) ->
+                       TruncP (\Sigma (t : A)
+                                      (rule* rule y t)
+                                      (rule* rule z t)))
+                   (p : \Sigma (rule x y) (rule x z))
+        : TruncP (\Sigma (t : A)
+                         (rule* rule y t)
+                         (rule* rule z t))
+        | A, rule, x, y, z, f, p => f x y z
+                                      (tupleMap (byLeft o base) (byLeft o base) p)
     }
 
   \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : REL A)
-                                                        (pr1 : stronglyNormalizing rule)
+                                                        (pr1 : stronglyNormalizing (rule* rule))
                                                         (pr2 : weaklyConfluent rule)
     : confluent rule =>
-    _help1 A rule pr1 pr2
+    \lam (x : A) =>
+        \lam (y z : A) =>
+            \lam (p : \Sigma (rule* rule x y) (rule* rule x z)) =>
+                _help A rule x y z pr1 pr2 p.1 p.2
     \where {
-      \func _help1 (A : \Set) (rule : REL A)
-                   (pr1 : stronglyNormalizing rule)
-                   (pr2 : weaklyConfluent rule) : confluent rule
-        | A, rule, p1, p2 => \lam (x : A) =>
-            inP (\lam (y z : A) =>
-                \lam (t1 : \Sigma (TransClosure rule x y || (x = y)) (TransClosure rule x z || (x = z))) => {?})
-
-      -- stronglyNormalizing {A} rule === wellFounded rule === \Pi (x : A) -> acc rule x
-      -- accREL (f : \Pi (b : A) -> (rel b a) -> acc rel b)
-      -- {A : \Set} (rel : REL A) (a : A)
-      --                (P : \Pi (a : A) -> (acc rel a -> \Type))
-      --                (f : \Pi (a : A) ->
-      --                    \Pi (h : \Pi (b : A) -> (rel b a) -> acc rel b) ->
-      --                        (\Pi (b : A) -> \Pi (l : rel b a) -> P b (h b l)) ->
-      --                        P a (accREL h : acc rel a))
-      --                (b : A)
-      --                (c : acc rel b)
-      --        : P b c
-      -- confluent {A} rule === \Pi (x : A) ->
-      --        TruncP (\Pi (y z : A) ->
-      --            \Sigma (rule* x y) (rule* x z) ->
-      --            \Sigma (t : A) (rule* y t) (rule* z t))
+      \func _help (A : \Set)
+                  (rule : REL A)
+                  (x y z : A)
+                  (pr1 : stronglyNormalizing (rule* rule))
+                  (pr2 : weaklyConfluent rule)
+                  (t1 : (rule* rule) x y)
+                  (t2 : (rule* rule) x z)
+        : TruncP (\Sigma (t : A)
+                         ((rule* rule) y t)
+                         ((rule* rule) z t))
+        | A, rule, x, y, z, pr1, pr2, byLeft a, byRight b =>
+          inP (y, byRight idp, byLeft (transport (\lam v => rule+ rule v y) b a))
+        | A, rule, x, y, z, pr1, pr2, byRight b, byLeft a =>
+          inP (z, byLeft (transport (\lam v => rule+ rule v z) b a), byRight idp)
+        | A, rule, x, y, z, pr1, pr2, byRight b, byRight b1 =>
+          inP (y, byRight idp, byRight (inv b1 *> b))
+        | A, rule, x, y, z, pr1, f, byLeft uu, byLeft tt =>
+          f x y z (acc.ind
+                       (rule* rule)
+                       x
+                       (\lam (a : A) => \lam (u : acc (rule* rule) a) => rule a y)
+                       (\lam q1 q2 q3 => q3 q1 (byRight idp))
+                       x (pr1 x),
+                   acc.ind
+                       (rule* rule)
+                       x
+                       (\lam (a : A) => \lam (u : acc (rule* rule) a) => rule a z)
+                       (\lam q1 q2 q3 => q3 q1 (byRight idp))
+                       x (pr1 x))
     }
 }
