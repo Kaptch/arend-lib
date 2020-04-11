@@ -4,368 +4,560 @@
 \import Data.Sigma
 
 \module Relation \where {
-  \func REL (A : \Set)
-    : \Type =>
-    A -> A -> \Prop
+  \module Base \where {
+    \func relation (A : \Set)
+      : \Type =>
+      A -> A -> \Prop
 
-  \func isRefl {A : \Set} (r : REL A)
-    : \Prop =>
-    \Pi (x : A) -> r x x
+    \func reflexive {A : \Set}
+                    (r : relation A)
+      : \Prop =>
+      \Pi (x : A) -> r x x
 
-  \func isSymm {A : \Set} (r : REL A)
-    : \Prop =>
-    \Pi (x y : A) -> r x y -> r y x
+    \func symmetric {A : \Set}
+                    (r : relation A)
+      : \Prop =>
+      \Pi (x y : A) -> r x y -> r y x
 
-  \func isTrans {A : \Set} (r : REL A)
-    : \Prop =>
-    \Pi (x y z : A) -> r x y -> r y z -> r x z
+    \func transitive {A : \Set}
+                     (r : relation A)
+      : \Prop =>
+      \Pi (x y z : A) -> r x y -> r y z -> r x z
 
-  \func flip {A : \Set} (r : REL A)
-    : REL A =>
-    \lam (x y : A) => r y x
+    \func antisymmetric {A : \Set}
+                        (r : relation A)
+      : \Prop =>
+      \Pi (x y : A) -> r x y -> r y x -> x = y
 
-  \func implies {A : \Set} (r : REL A) (p : REL A)
-    : \Prop =>
-    \Pi (x y : A) -> r x y -> p x y
+    \func equivalence {A : \Set}
+                      (r : relation A)
+      : \Prop =>
+      \Sigma (reflexive r)
+             (symmetric r)
+             (transitive r)
 
-  \func union {A : \Set}
-              (rel1 : REL A)
-              (rel2 : REL A)
-    : REL A =>
-    \lam (x y : A) => rel1 x y || rel2 x y
+    \func inverse {A : \Set}
+                  (r : relation A)
+      : relation A =>
+      \lam (x y : A) => r y x
 
-  \func idREL {A : \Set}
-    : REL A =>
-    \lam (x y : A) => x = y
+    \data co-relation {A : \Set}
+                      (rel : relation A) (a b : A)
+      | op (rel b a)
 
-  \func closure {A : \Set}
-                (initRel : REL A)
-                (prop : REL A -> \Prop)
-                (build : REL A -> REL A)
-    : \Type =>
-    \Sigma (newRel : REL A)
-           (prop newRel)
-           (p : newRel = build initRel)
-           (\Pi (p : REL A) ->
-               implies initRel p ->
-               prop p ->
-               implies newRel p)
+    \func inclusion {A : \Set}
+                    (r : relation A)
+                    (p : relation A)
+      : \Prop =>
+      \Pi (x y : A) -> r x y -> p x y
 
-  \func reflClosure {A : \Set}
-                    (rel : REL A)
-    : closure rel isRefl _buildReflClosure =>
-    (_buildReflClosure rel,
-     _isRefl rel,
-     idp,
-     _implies rel)
-    \where {
-      \func _buildReflClosure {A : \Set}
-                              (r : REL A)
-        : REL A =>
-        union r idREL
+    \func equals {A : \Set}
+                 (r : relation A)
+                 (p : relation A)
+      : \Prop =>
+      \Sigma (inclusion r p)
+             (inclusion p r)
 
-      \func _isRefl {A : \Set}
-                    (r : REL A)
-        : isRefl (_buildReflClosure r) =>
-        \lam _ => byRight idp
+    \func commutes {A : \Set}
+                   (r : relation A)
+                   (p : relation A)
+      : \Prop =>
+      \Pi (x y : A) ->
+          r y x ->
+          \Pi (z : A) (p z y) ->
+              TruncP (\Sigma (a : A)
+                             (p a x)
+                             (r z a))
 
-      \func _implies {A : \Set}
-                     (rel : REL A)
-                     (p : REL A)
-                     (i1 : implies rel p)
-                     (pr : isRefl p)
-        : implies (_buildReflClosure rel) p
-        | rel, p, i1, pr =>
-          \lam x y =>
-              \lam u =>
-                  \case u \with {
-                    | byLeft a => i1 x y a
-                    | byRight b => coe2 (@ (pmap2 p idp b))
-                                        left
-                                        (pr x)
-                                        right
-                  }
-    }
+    \func union {A : \Set}
+                (rel1 : relation A)
+                (rel2 : relation A)
+      : relation A =>
+      \lam (x y : A) => rel1 x y || rel2 x y
 
-  \func symmClosure {A : \Set}
-                    (rel : REL A)
-    : closure rel isSymm _buildSymmClosure =>
-    (_buildSymmClosure rel,
-     _isSymm rel,
-     idp,
-     _implies rel)
-    \where {
-      \func _buildSymmClosure {A : \Set} (r : REL A) : REL A =>
-        union r (flip r)
+    \func closure {A : \Set}
+                  (initial : relation A)
+                  (property : relation A -> \Prop)
+                  (constructor : relation A -> relation A)
+      : \Type =>
+      \Sigma (new : relation A)
+             (property new)
+             (p : new = constructor initial)
+             (\Pi (p : relation A) ->
+                 inclusion initial p ->
+                 property p ->
+                 inclusion new p)
+  }
 
-      \func _isSymm {A : \Set}
-                    (r : REL A)
-        : isSymm (_buildSymmClosure r) =>
-        \lam (x y : A) => ||.rec Path.inProp
-                                 byRight
-                                 byLeft
+  \module ReflexiveClosure \where {
+    \open Base
 
-      \func _implies {A : \Set}
-                     (rel : REL A)
-                     (p : REL A)
-                     (i1 : implies rel p)
-                     (pr : isSymm p)
-        : implies (_buildSymmClosure rel) p
-        | rel, p, i1, pr =>
-          \lam x y =>
-              \lam q =>
-                  \case q \with {
-                    | byLeft (t1 : rel x y) => i1 x y t1
-                    | byRight (t2 : rel y x) => pr y x (i1 y x t2)
-                  }
-    }
+    \func reflexiveClosure {A : \Set}
+                           (rel : relation A)
+      : closure rel reflexive constructor =>
+      (constructor rel,
+       _reflexive rel,
+       idp,
+       _inclusion rel)
+      \where {
+        \func constructor {A : \Set}
+                          (r : relation A)
+          : relation A =>
+          union r (=)
 
-  -- Lemma 10.3.2 smh is proved by Arend (accessibility is a mere property)
+        \func _reflexive {A : \Set}
+                         (r : relation A)
+          : reflexive (constructor r) =>
+          \lam _ => byRight idp
 
-  \data acc {A : \Set}
-            (rel : REL A)
-            (a : A)
-  : \Prop
-    | accREL (f : \Pi (b : A) -> (rel b a) -> acc rel b)
-    \where
-      \func ind {A : \Set}
-                (rel : REL A)
-                (a : A)
-                (P : \Pi (a : A) -> (acc rel a -> \Type))
-                (f : \Pi (a : A) ->
-                    \Pi (h : \Pi (b : A) -> (rel b a) -> acc rel b) ->
-                        (\Pi (b : A) -> \Pi (l : rel b a) -> P b (h b l)) ->
-                        P a (accREL h : acc rel a))
-                (b : A)
-                (c : acc rel b)
-        : P b c
-        | rel', _, P', f', b', (accREL h') =>
-          f' b' h' (\lam b => \lam l => ind rel' b' P' f' b (h' b l))
-
-  \func wellFounded {A : \Set}
-                    (rel : REL A)
-    : \Prop =>
-    \Pi (x : A) -> acc rel x
-
-  \truncated \data TransClosure {A : \Set}
-                                (rel : REL A)
-                                (a b : A)
-  : \Prop
-    | base (r : rel a b)
-    | cons (x : A) (t : rel a x) (r : (TransClosure rel) x b)
-
-  \func concat {A : \Set}
-               (rel : REL A)
-               (a b c : A)
-               (r1 : TransClosure rel a b)
-               (r2 : TransClosure rel b c)
-    : TransClosure rel a c
-    | rel, a, b, c, base r1, base r2 => cons b r1 (base r2)
-    | rel, a, b, c, base r1, cons x2 t2 r2 => cons b r1 (cons x2 t2 r2)
-    | rel, a, b, c, cons x1 t1 r1, base r2 => cons x1 t1 (concat rel x1 b c r1 (base r2))
-    | rel, a, b, c, cons x1 t1 r1, cons x2 t2 r2 => cons x1 t1  (concat rel x1 b c r1 (cons x2 t2 r2))
-
-  \func transClosure {A : \Set}
-                     (rel : REL A)
-    : closure rel isTrans _buildTransClosure =>
-    (_buildTransClosure rel,
-     _isTrans rel,
-     idp,
-     _implies rel)
-    \where {
-      \func _buildTransClosure {A : \Set} (r : REL A) : REL A => TransClosure r
-
-      \func _isTrans {A : \Set}
-                     (rel : REL A)
-        : isTrans (_buildTransClosure rel) =>
-        \lam x y z =>
-            \lam r =>
-                \lam q =>
-                    concat rel x y z r q
-
-      \func _implies {A : \Set}
-                     (rel : REL A)
-                     (p : REL A)
-                     (i1 : implies rel p)
-                     (transPr : isTrans p)
-                     (x y : A)
-                     (t : TransClosure rel x y) : p x y
-        | rel, p, i1, transPr, x, y, base r1 =>
-          i1 x y r1
-        | rel, p, i1, transPr, x, y, cons x1 t1 r1 =>
-          transPr x x1 y (i1 x x1 t1) (_implies rel p i1 transPr x1 y r1)
-    }
-
-  \func transReflClosure {A : \Set} (rel : REL A)
-    : closure rel
-              (\lam (r : REL A) => (isTrans r && isRefl r))
-              _buildTransReflClosure =>
-    (_buildTransReflClosure rel,
-     prod (_isTrans rel) (_isRefl rel),
-     idp,
-     _implies rel)
-    \where {
-      \func _buildTransReflClosure {A : \Set}
-                                   (r : REL A)
-        : REL A =>
-        (reflClosure (TransClosure r)).1
-
-      \func _isTrans {A : \Set} (r : REL A) (x y z : A)
-                     (p : TransClosure r x y || (x = y))
-                     (t : TransClosure r y z || (y = z))
-        : TransClosure r x z || (x = z)
-        | r, a, b, c, byRight b1, byRight b2 =>
-          byRight (b1 *> b2)
-        | r, a, b, c, byLeft b1, byRight b2 =>
-          byLeft (transport (\lam v => TransClosure r a v) b2 b1)
-        | r, a, b, c, byRight b1, byLeft b2 =>
-          byLeft (transport (\lam v => TransClosure r v c) (inv b1) b2)
-        | r, a, b, c, byLeft b1, byLeft b2 =>
-          byLeft (concat r a b c b1 b2)
-
-      \func _isRefl {A : \Set}
-                    (r : REL A)
-        : \Pi (x : A) -> (_buildTransReflClosure r) x x =>
-        \lam (a : A) => byRight idp
-
-      \func _implies {A : \Set}
-                     (rel : REL A)
-                     (p : REL A)
-                     (i1 : implies rel p)
-                     (pr : isTrans p && isRefl p)
-                     (x y : A)
-                     (t : (_buildTransReflClosure rel x y)) : p x y
-        | rel, p, i1, prod a b, x, y, byLeft a1 =>
-          \case a1 \with {
-            | base r' => i1 x y r'
-            | cons x' t' r' => a x x' y
-                                 (transClosure._implies rel p i1 a x x' (base t'))
-                                 (transClosure._implies rel p i1 a x' y r')
-          }
-        | rel, p, i1, prod a b, x, y, byRight b1 => coe2
-            (@ (pmap2 p idp b1))
-            left
-            (b x)
-            right
-    }
-
-  \func transReflSymmClosure {A : \Set}
-                             (rel : REL A)
-    : closure rel
-              (\lam (r : REL A) => ((isTrans r && isRefl r) && isSymm r))
-              _buildTransReflSymmClosure =>
-    (_buildTransReflSymmClosure rel,
-     prod (prod (_isTrans rel) (_isRefl rel)) (_isSymm rel),
-     idp,
-     _implies rel)
-    \where {
-      \func _buildTransReflSymmClosure {A : \Set}
-                                       (r : REL A)
-        : REL A =>
-        (reflClosure (symmClosure (transClosure r).1).1).1
-
-      \func _isTrans {A : \Set}
-                     (r : REL A)
-        : \Pi (x y z : A) ->
-          (_buildTransReflSymmClosure r) x y ->
-          (_buildTransReflSymmClosure r) y z ->
-          (_buildTransReflSymmClosure r) x z =>
-        \lam (x y z : A) =>
-            \lam (p1 : (TransClosure r x y || TransClosure r y x) || (x = y)) =>
-                \lam (p2 : (TransClosure r y z || TransClosure r z y) || (y = z)) =>
-                    \case p1, p2 \with {
-                      | byLeft a1, byLeft a2 => \case a1, a2 \with {
-                        | byLeft a1', byLeft a2' => (byLeft o byLeft) (cons y {?} a2')
-                        | byLeft a1', byRight b2' => {?} -- TODO
-                        | byRight b1', byLeft a2' => {?} -- TODO
-                        | byRight b1', byRight b2' => (byLeft o byRight) (cons y {?} b1')
-                      }
-                      | byLeft a1, byRight b2 => \case a1 \with {
-                        | byLeft a'' => (byLeft o byLeft) (transport (\lam v => TransClosure r x v) b2 a'')
-                        | byRight b'' => (byLeft o byRight) (transport (\lam v => TransClosure r v x) b2 b'')
-                      }
-                      | byRight b1, byLeft a2 => \case a2 \with {
-                        | byLeft a'' => (byLeft o byLeft) (transport (\lam v => TransClosure r v z) (inv b1) a'')
-                        | byRight b'' => (byLeft o byRight) (transport (\lam v => TransClosure r z v) (inv b1) b'')
-                      }
-                      | byRight b1, byRight b2 => byRight (b1 *> b2)
+        \func _inclusion {A : \Set}
+                         (rel : relation A)
+                         (p : relation A)
+                         (i1 : inclusion rel p)
+                         (pr : reflexive p)
+          : inclusion (constructor rel) p
+          | rel, p, i1, pr =>
+            \lam x y =>
+                \lam u =>
+                    \case u \with {
+                      | byLeft a => i1 x y a
+                      | byRight b => coe2 (@ (pmap2 p idp b))
+                                          left
+                                          (pr x)
+                                          right
                     }
+      }
+  }
 
-      \func _isRefl {A : \Set} (r : REL A)
-        : \Pi (x : A) ->
-          (_buildTransReflSymmClosure r) x x =>
-        \lam (x : A) => byRight idp
+  -- TODO: rewrite with inductive definition
 
-      \func _isSymm {A : \Set} (r : REL A)
-        : \Pi (x y : A) ->
-          (_buildTransReflSymmClosure r) x y ->
-          (_buildTransReflSymmClosure r) y x =>
-        \lam (x y : A) =>
-            \lam (p : (TransClosure r x y || TransClosure r y x) || (x = y)) => \case p \with {
-              | byLeft a => \case a \with {
-                | byLeft a' => (byLeft o byRight) a'
-                | byRight b' => (byLeft o byLeft) b'
-              }
-              | byRight b => byRight (inv b)
-            }
+  \module SymmetricClosure \where {
+    \open Base
 
-      \func _implies{A : \Set}
-                    (rel : REL A)
-                    (p : REL A)
-                    (i1 : implies rel p)
-                    (pr : (isTrans p && isRefl p) && isSymm p)
-                    (x y : A)
-                    (t : (_buildTransReflSymmClosure rel) x y)
-        : p x y
-        | rel, p, i1, prod (prod p1 p2) p3, x, y, byLeft a => \case a \with {
-          | byLeft a1 => \case a1 \with {
-            | base r' => i1 x y r'
-            | cons x' t' r' => p1 x x' y
-                                  (transClosure._implies rel p i1 p1 x x' (base t'))
-                                  (transClosure._implies rel p i1 p1 x' y r')
-          }
-          | byRight b1 => \case b1 \with {
-            | base r' => p3 y x (i1 y x r')
-            | cons x' t' r' => p3 y x (p1 y x' x
-                                          (transClosure._implies rel p i1 p1 y x' (base t'))
-                                          (transClosure._implies rel p i1 p1 x' x r'))
-          }
-        }
-        | rel, p, i1, prod (prod p1 p2) p3, x, y, byRight b => coe2
-            (@ (pmap2 p idp b))
-            left
-            (p2 x)
-            right
-    }
+    \func symmetricClosure {A : \Set}
+                           (rel : relation A)
+      : closure rel symmetric constructor =>
+      (constructor rel,
+       _symmetric rel,
+       idp,
+       _inclusion rel)
+      \where {
+        \func constructor {A : \Set}
+                          (r : relation A)
+          : relation A =>
+          union r (inverse r)
+
+        \func _symmetric {A : \Set}
+                         (r : relation A)
+          : symmetric (constructor r) =>
+          \lam (x y : A) => ||.rec Path.inProp
+                                   byRight
+                                   byLeft
+
+        \func _inclusion {A : \Set}
+                         (rel : relation A)
+                         (p : relation A)
+                         (i1 : inclusion rel p)
+                         (pr : symmetric p)
+          : inclusion (constructor rel) p
+          | rel, p, i1, pr =>
+            \lam x y =>
+                \lam q =>
+                    \case q \with {
+                      | byLeft (t1 : rel x y) => i1 x y t1
+                      | byRight (t2 : rel y x) => pr y x (i1 y x t2)
+                    }
+      }
+  }
+
+  \module TransitiveClosure \where {
+    \open Base
+
+    \truncated \data TC {A : \Set}
+                        (rel : relation A)
+                        (a b : A)
+    : \Prop
+      | base (r : rel a b)
+      | cons (x : A) (t : rel a x) (r : (TC rel) x b)
+
+    \func concat {A : \Set}
+                 (rel : relation A)
+                 (a b c : A)
+                 (r1 : TC rel a b)
+                 (r2 : TC rel b c)
+      : TC rel a c
+      | rel, a, b, c, base r1, base r2 =>
+        cons b r1 (base r2)
+      | rel, a, b, c, base r1, cons x2 t2 r2 =>
+        cons b r1 (cons x2 t2 r2)
+      | rel, a, b, c, cons x1 t1 r1, base r2 =>
+        cons x1 t1 (concat rel x1 b c r1 (base r2))
+      | rel, a, b, c, cons x1 t1 r1, cons x2 t2 r2 =>
+        cons x1 t1  (concat rel x1 b c r1 (cons x2 t2 r2))
+
+    \func transitiveClosure {A : \Set}
+                            (rel : relation A)
+      : closure rel transitive constructor =>
+      (constructor rel,
+       _transitive rel,
+       idp,
+       _inclusion rel)
+      \where {
+        \func constructor {A : \Set}
+                          (r : relation A)
+          : relation A =>
+          TC r
+
+        \func _transitive {A : \Set}
+                          (rel : relation A)
+          : transitive (constructor rel) =>
+          \lam x y z =>
+              \lam r =>
+                  \lam q =>
+                      concat rel x y z r q
+
+        \func _inclusion {A : \Set}
+                         (rel : relation A)
+                         (p : relation A)
+                         (i1 : inclusion rel p)
+                         (transPr : transitive p)
+                         (x y : A)
+                         (t : TC rel x y)
+          : p x y
+          | rel, p, i1, transPr, x, y, base r1 =>
+            i1 x y r1
+          | rel, p, i1, transPr, x, y, cons x1 t1 r1 =>
+            transPr x x1 y (i1 x x1 t1) (_inclusion rel p i1 transPr x1 y r1)
+      }
+  }
+
+  \module ReflexiveTransitiveClosure \where {
+    \open Base
+
+    \truncated \data RTC {A : \Set}
+                         (rel : relation A)
+                         (a b : A)
+    : \Prop
+      | base (r : a = b)
+      | cons (x : A)  (t : rel a x) (r : (RTC rel) x b)
+
+    \func reflexiveTransitiveClosure {A : \Set}
+                                     (rel : relation A)
+      : closure rel
+                (\lam (r : relation A) => \Sigma (transitive r) (reflexive r))
+                constructor =>
+      (constructor rel,
+       (_transitive rel, _reflexive rel),
+       idp,
+       _inclusion rel)
+      \where {
+        \func constructor {A : \Set}
+                          (r : relation A)
+          : relation A =>
+          RTC r
+
+        \func _transitive {A : \Set} (r : relation A) (x y z : A)
+                          (p : RTC r x y)
+                          (t : RTC r y z)
+          : RTC r x z
+          | r, x, y, z, base r1, base r2 =>
+            base (r1 *> r2)
+          | r, x, y, z, base r1, cons x1 t r2 =>
+            transport (\lam v => RTC r v z) (inv r1) (cons x1 t r2)
+          | r, x, y, z, cons x1 t r1, base r2 =>
+            cons x1 t (transport (\lam v => RTC r x1 v) r2 r1)
+          | r, x, y, z, cons x1 t r1, cons x2 t1 r2 =>
+            concat r x y z (cons x1 t r1) (cons x2 t1 r2)
+
+        \func _reflexive {A : \Set}
+                         (r : relation A)
+          : \Pi (x : A) -> (RTC r) x x =>
+          \lam (a : A) => base idp
+
+        \func _inclusion {A : \Set}
+                         (rel : relation A)
+                         (p : relation A)
+                         (i1 : inclusion rel p)
+                         (pr : \Sigma (transitive p) (reflexive p))
+                         (x y : A)
+                         (t : (constructor rel x y)) : p x y
+          | rel, p, i1, pr, x, y, base r => coe2
+              (@ (pmap2 p idp r))
+              left
+              (pr.2 x)
+              right
+          | rel, p, i1, pr, x, y, cons x1 t r => pr.1 x x1 y (i1 x x1 t) (_inclusion rel p i1 pr x1 y r)
+      }
+
+    \func concat {A : \Set}
+                 (rel : relation A)
+                 (a b c : A)
+                 (r1 : RTC rel a b)
+                 (r2 : RTC rel b c)
+      : RTC rel a c
+      | rel, a, b, c, base r1, base r2 =>
+        base (r1 *> r2)
+      | rel, a, b, c, base r1, r2 =>
+        transport (\lam v => RTC rel v c) (inv r1) r2
+      | rel, a, b, c, cons x1 t1 r1, base r2 =>
+        cons x1 t1 (concat rel x1 b c r1 (base r2))
+      | rel, a, b, c, cons x1 t1 r1, cons x2 t2 r2 =>
+        cons x1 t1  (concat rel x1 b c r1 (cons x2 t2 r2))
+  }
+
+  \module ReflexiveSymmetricTransitiveClosure \where {
+    \open Base
+
+    \truncated \data RSTC {A : \Set}
+                          (rel : relation A)
+                          (a b : A)
+    : \Prop
+      | step (r : rel a b)
+      | refl (p : a = b)
+      | flip (t : RSTC rel b a)
+      | cons (x : A) (t : (RSTC rel) a x) (r : (RSTC rel) x b)
+
+    \func reflexiveSymmetricTransitiveClosure {A : \Set}
+                                              (rel : relation A)
+      : closure rel
+                (\lam (r : relation A) => \Sigma (transitive r) (reflexive r) (symmetric r))
+                constructor =>
+      (constructor rel,
+       (_transitive rel, _reflexive rel, _symmetric rel),
+       idp,
+       _inclusion rel)
+      \where {
+        \func constructor {A : \Set}
+                          (r : relation A)
+          : relation A =>
+          RSTC r
+
+        \func _transitive {A : \Set}
+                          (r : relation A)
+                          (x y z : A)
+                          (p1 : constructor r x y)
+                          (p2 : constructor r y z)
+          : constructor r x z => cons y p1 p2
+
+        \func _reflexive {A : \Set} (r : relation A)
+          : \Pi (x : A) ->
+            (constructor r) x x =>
+          \lam (x : A) => refl idp
+
+        \func _symmetric {A : \Set} (r : relation A)
+          : \Pi (x y : A) ->
+            (constructor r) x y ->
+            (constructor r) y x =>
+          \lam (x y : A) =>
+              \lam (p : RSTC r x y) => flip p
+
+        \func _inclusion {A : \Set}
+                         (rel : relation A)
+                         (p : relation A)
+                         (i1 : inclusion rel p)
+                         (pr : \Sigma (transitive p) (reflexive p) (symmetric p))
+                         (x y : A)
+                         (t : (constructor rel) x y)
+          : p x y
+          | rel, p, i1, pr, x, y, step r => i1 x y r
+          | rel, p, i1, pr, x, y, refl p1 => coe2
+              (@ (pmap2 p idp p1))
+              left
+              (pr.2 x)
+              right
+          | rel, p, i1, pr, x, y, flip t => pr.3 y x (_inclusion rel p i1 pr y x t)
+          | rel, p, i1, pr, x, y, cons x1 t r => pr.1 x x1 y (_inclusion rel p i1 pr x x1 t) (_inclusion rel p i1 pr x1 y r)
+      }
+
+    \func concat {A : \Set}
+                 (rel : relation A)
+                 (a b c : A)
+                 (r1 : RSTC rel a b)
+                 (r2 : RSTC rel b c)
+      : RSTC rel a c => cons b r1 r2
+  }
+
+  \module Utils \where {
+    \open Base
+
+    \func plusToStar {A : \Set}
+                     (rel : relation A)
+                     (a b : A)
+                     (r : TransitiveClosure.TC rel a b)
+      : ReflexiveTransitiveClosure.RTC rel a b
+      | rel, a, b, TransitiveClosure.TC.base r =>
+        ReflexiveTransitiveClosure.RTC.cons b r (ReflexiveTransitiveClosure.RTC.base idp : ReflexiveTransitiveClosure.RTC rel b b)
+      | rel, a, b, TransitiveClosure.TC.cons x t r =>
+        ReflexiveTransitiveClosure.RTC.cons x t (plusToStar rel x b r)
+
+    \func starToPlus {A : \Set}
+                     (rel : relation A)
+                     (a b c : A)
+                     (p : rel a b)
+                     (r : ReflexiveTransitiveClosure.RTC rel b c)
+      : TransitiveClosure.TC rel a c
+      | rel, a, b, c, p, ReflexiveTransitiveClosure.RTC.base r =>
+        transport (\lam v => TransitiveClosure.TC rel a v) r (TransitiveClosure.TC.base p)
+      | rel, a, b, c, p, ReflexiveTransitiveClosure.RTC.cons x t r =>
+        TransitiveClosure.TC.cons b p (starToPlus rel b x c t r)
+  }
+
+  \module Wellfounded \where {
+    \open Base
+
+    \data acc {A : \Set}
+              (rel : relation A)
+              (a : A)
+    : \Type
+      | accREL (f : \Pi (b : A) -> rel b a -> acc rel b)
+      \where
+        \func ind {A : \Set}
+                  {rel : relation A}
+                  (P : \Pi (a : A) -> acc rel a -> \Type)
+                  (f : \Pi (a : A) ->
+                      \Pi (h : \Pi (b : A) -> (rel b a) -> acc rel b) ->
+                          (\Pi (b : A) -> \Pi (l : rel b a) -> P b (h b l)) ->
+                          P a (accREL h))
+                  (a : A)
+                  (c : acc rel a)
+          : P a c
+          |  P, f, a, (accREL h) =>
+            f a h (\lam b => \lam l => ind P f b (h b l))
+
+    \func isProp (A : \Set)
+                 (rel : relation A)
+                 (a : A)
+                 (s1 s2 : acc rel a)
+      : s1 = s2
+      | A, rel, a, p1, p2 =>
+        \let
+          | P1 : \Pi (a : A) -> \Pi (s1 : acc rel a) -> \Type =>
+            \lam (a' : A) =>
+                \lam (s1' : acc rel a') =>
+                    \Pi (s2' : acc rel a') -> s1' = s2'
+
+          | P2 : \Pi (a : A) -> \Pi (s2 : acc rel a) -> \Type =>
+            \lam (a : A) => \lam (s2 : acc rel a) => \Pi (a : A) -> \Pi (h : \Pi (b : A) -> rel b a -> acc rel b) ->
+                \Pi (k : \Pi (b : A) -> \Pi (l : rel b a) -> \Pi (s2 : acc rel b) -> h b l = s2) ->
+                    \Pi (s2 : acc rel a) -> accREL h = s2
+
+          | P2_term
+          : \Pi (a : A) ->
+              \Pi (s2 : acc rel a) ->
+                  P2 a s2 =>
+            \lam (a : A) =>
+                \lam (s2 : acc rel a) =>
+                    acc.ind
+                        P2
+                        (\lam (a : A) =>
+                            \lam (h2 : \Pi (b : A) -> rel b a -> acc rel b) =>
+                                \lam (k2 : \Pi (b : A) -> rel b a -> \Pi (a : A) -> \Pi (h1 : \Pi (b : A) -> rel b a -> acc rel b) ->
+                                    (\Pi (b : A) -> \Pi (l : rel b a) -> \Pi (s2 : acc rel b) -> h1 b l = s2) ->
+                                    \Pi (s2 : acc rel a) -> accREL h1 = s2) =>
+                                    \lam (a : A) =>
+                                        \lam (h1 : \Pi (b : A) -> rel b a -> acc rel b) =>
+                                            \lam (k1 : \Pi (b : A) -> \Pi (l : rel b a) -> \Pi (s2 : acc rel b) -> h1 b l = s2) =>
+                                                \lam (s : acc rel a) => k2 a {?} a h1 k1 s)
+                        a
+                        s2
+        \in
+          (acc.ind
+              P1
+              (P2_term a p2)
+              a
+              p1)
+              p2
+
+    \func wellFounded {A : \Set}
+                      (rel : relation A)
+      : \Prop =>
+      \Pi (x : A) -> acc rel x
+
+    \func downwardsClosed {A : \Set}
+                          (rel : relation A)
+                          (x y : A)
+                          (p : acc (TransitiveClosure.TC rel) y)
+                          (r : TransitiveClosure.TC rel x y)
+      : acc (TransitiveClosure.TC rel) x
+      | rel, x, y, accREL f, r =>
+        accREL (\lam z r' => f z (TransitiveClosure.concat rel z x y r' r))
+
+    \func accTransitiveClosure {A : \Set}
+                               (rel : relation A)
+                               (x : A)
+                               (a : acc rel x)
+      : acc (TransitiveClosure.TC rel) x
+      | rel, x, f => accREL (help rel f)
+      \where
+        \func help {A : \Set}
+                   (rel : relation A)
+                   {x : A}
+                   (w : acc rel x)
+                   (b : A) (rs : TransitiveClosure.TC rel b x)
+          : acc (TransitiveClosure.TC rel) b
+          | rel, accREL f, b, TransitiveClosure.base r => accTransitiveClosure rel b (f b r)
+          | rel, a, b, TransitiveClosure.cons x' t' r' => downwardsClosed rel b x'
+                                                                          (help rel a x' r')
+                                                                          (TransitiveClosure.base t')
+
+    \func wellFoundedTransitive {A : \Set}
+                                (rel : relation A)
+                                (w : wellFounded rel)
+      : wellFounded (TransitiveClosure.TC rel) =>
+      \lam (x : A) => accTransitiveClosure rel x (w x)
+  }
 }
 
 \module ARS \where {
   \open Relation
+  \open Relation.Base
+  \open Relation.Utils
 
   \func rule* {A : \Set}
-              (rule : REL A)
-    : REL A =>
-    (transReflClosure rule).1
+              (rule : relation A)
+    : relation A =>
+    ReflexiveTransitiveClosure.reflexiveTransitiveClosure.constructor rule
 
   \func rule+ {A : \Set}
-              (rule : REL A)
-    : REL A =>
-    (transClosure rule).1
+              (rule : relation A)
+    : relation A =>
+    TransitiveClosure.transitiveClosure.constructor rule
+
+  -- TODO: revisit spans and rewrite important definitions using them
+  --  \func span {A : \Set}
+  --             (r : relation A)
+  --    : \Type =>
+  --    \Sigma (x : A) (y : A) (z : A) (r x y) (r x z)
+  --
+--  \func cospan {A : \Set}
+  --                (r : relation A)
+  --    : \Type =>
+  --    \Sigma (x : A) (y : A) (z : A) (r y x) (r z x)
+  --
+--  \func extended-span {A : \Set}
+  --                      (r : relation A)
+  --    : \Type =>
+  --    \Sigma (x : A) (y : A) (z : A) (rule* r x y) (rule* r x z)
+  --
+--  \func extended-cospan {A : \Set}
+  --                         (r : relation A)
+  --    : \Type =>
+  --    \Sigma (x : A) (y : A) (z : A) (rule* r y x) (rule* r z x)
 
   \func stronglyNormalizing {A : \Set}
-                            (rule : REL A)
+                            (rule : relation A)
     : \Prop =>
-    wellFounded rule
+    Wellfounded.wellFounded (co-relation rule)
 
   \func isNormalForm {A : \Set}
-                     (rule : REL A)
+                     (rule : relation A)
     : A -> \Prop =>
     \lam (x : A) =>
         Not (\Sigma (y : A)
                     (rule x y))
 
   \func hasNormalForm {A : \Set}
-                      (rule : REL A)
+                      (rule : relation A)
     : A -> \Prop =>
     \lam (x : A) =>
         TruncP (\Sigma (y : A)
@@ -373,146 +565,87 @@
                        (isNormalForm rule y))
 
   \func weaklyNormalizing {A : \Set}
-                          (rule : REL A)
+                          (rule : relation A)
     : \Prop =>
     \Pi (x : A) -> hasNormalForm rule x
 
   \func weaklyConfluent {A : \Set}
-                        (rule : REL A)
+                        (rule : relation A)
     : \Prop =>
-    \Pi (x : A) ->
-        \Pi (y z : A) ->
-            \Sigma (rule x y) (rule x z) ->
-            TruncP (\Sigma (t : A)
-                           (rule* rule y t)
-                           (rule* rule z t))
+    \Pi (x y z : A) ->
+        \Sigma (rule x y) (rule x z) ->
+        TruncP (\Sigma (t : A)
+                       (rule* rule y t)
+                       (rule* rule z t))
 
   \func confluent {A : \Set}
-                  (rule : REL A) : \Prop =>
-    \Pi (x : A) ->
-        \Pi (y z : A) ->
-            \Sigma (rule* rule x y) (rule* rule x z) ->
-            TruncP (\Sigma (t : A)
-                           (rule* rule y t)
-                           (rule* rule z t))
+                  (rule : relation A) : \Prop =>
+    \Pi (x y z : A) ->
+        \Sigma (rule* rule x y) (rule* rule x z) ->
+        TruncP (\Sigma (t : A)
+                       (rule* rule y t)
+                       (rule* rule z t))
 
   \func confluent->weaklyConfluent {A : \Set}
-                                   (rule : REL A)
+                                   (rule : relation A)
     : confluent rule -> weaklyConfluent rule =>
     \lam (c : confluent rule) =>
-        \lam (x : A) =>
-            \lam (y z : A) =>
-                \lam (p : \Sigma (rule x y) (rule x z)) =>
-                    (_help2 A rule x y z c p)
-    \where {
-      \func _help1 {A : \Type}
-                   {B C D : A -> \Type}
-                   (f : \Pi (a : A) -> (C a) -> (D a))
-                   (p : \Sigma (a : A) (B a) (C a))
-        : \Sigma (a : A)
-                 (B a)
-                 (D a) \elim p
-        | (a, b, c) => (a, b, f a c)
+        \lam (x y z : A) =>
+            \lam (p : \Sigma (rule x y) (rule x z)) =>
+                c x y z
+                  ((ReflexiveTransitiveClosure.cons y p.1 (ReflexiveTransitiveClosure.base idp)),
+                   (ReflexiveTransitiveClosure.cons z p.2 (ReflexiveTransitiveClosure.base idp)))
 
-      \func _help2 (A : \Set)
-                   (rule : REL A)
-                   (x y z : A)
-                   (t : \Pi (x : A) -> \Pi (y z : A) ->
-                       \Sigma (rule* rule x y) (rule* rule x z) ->
-                       TruncP (\Sigma (t : A)
-                                      (rule* rule y t)
-                                      (rule* rule z t)))
-                   (p : \Sigma (rule x y) (rule x z))
-        : TruncP (\Sigma (t : A)
-                         (rule* rule y t)
-                         (rule* rule z t))
-        | A, rule, x, y, z, f, p => f x y z
-                                      (tupleMap (byLeft o base) (byLeft o base) p)
-    }
-
-  \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : REL A)
-                                                        (pr1 : stronglyNormalizing (rule+ rule))
+  \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : relation A)
+                                                        (pr1 : stronglyNormalizing rule)
                                                         (pr2 : weaklyConfluent rule)
-    : confluent rule =>
-    \lam (x : A) =>
-        \lam (y z : A) =>
-            \lam (p : \Sigma (rule* rule x y) (rule* rule x z)) =>
-                _help1 A rule x y z pr1 pr2 p.1 p.2
+    : confluent rule => _help1 rule (Wellfounded.wellFoundedTransitive (co-relation rule) pr1) pr2
     \where {
-      \func _help1 (A : \Set)
-                   (rule : REL A)
-                   (x y z : A)
-                   (pr1 : stronglyNormalizing (rule+ rule))
+      \func _help1 {A : \Set}
+                   (rule : relation A)
+                   (pr1 : Wellfounded.wellFounded (rule+ (co-relation rule)))
                    (pr2 : weaklyConfluent rule)
-                   (t1 : (rule* rule) x y)
-                   (t2 : (rule* rule) x z)
-        : TruncP (\Sigma (t : A)
-                         ((rule* rule) y t)
-                         ((rule* rule) z t))
-        | A, rule, x, y, z, pr1, pr2, byLeft a, byRight b =>
-          inP (y, byRight idp, byLeft (transport (\lam v => rule+ rule v y) b a))
-        | A, rule, x, y, z, pr1, pr2, byRight b, byLeft a =>
-          inP (z, byLeft (transport (\lam v => rule+ rule v z) b a), byRight idp)
-        | A, rule, x, y, z, pr1, pr2, byRight b, byRight b1 =>
-          inP (y, byRight idp, byRight (inv b1 *> b))
-        | A, rule, x, y, z, pr1, pr2, byLeft uu, byLeft tt => _help2 A rule x y z pr1 pr2 uu tt
+        : confluent rule =>
+        \lam x y z span => _help2 rule x y z (pr1 x) pr2 span.1 span.2
 
-      \func _help2 (A : \Set)
-                   (rule : REL A)
+      \func _help2 {A : \Set}
+                   (rule : relation A)
                    (x y z : A)
-                   (pr1 : stronglyNormalizing (rule+ rule))
+                   (pr1 : Wellfounded.acc (rule+ (co-relation rule)) x)
                    (pr2 : weaklyConfluent rule)
-                   (t1 : (rule+ rule) x y)
-                   (t2 : (rule+ rule) x z)
+                   (r1 : ReflexiveTransitiveClosure.RTC rule x y)
+                   (r2 : ReflexiveTransitiveClosure.RTC rule x z)
         : TruncP (\Sigma (t : A)
-                         ((rule* rule) y t)
-                         ((rule* rule) z t))
-        | A, rule, x, y, z, pr1, pr2, base uur, base ttr => pr2 x y z (uur, ttr)
-        | A, rule, x, y, z, pr1, pr2, base uur, tt => _help3 A rule x y z pr1 pr2 uur tt
-        | A, rule, x, y, z, pr1, pr2, cons uux uut uur, base ttr => {?}
-        | A, rule, x, y, z, pr1, pr2, cons uux uut uur, cons ttx ttt ttr => {?}
-
-      \sfunc _help3 (A : \Set)
-                    (rule : REL A)
-                    (x y z : A)
-                    (pr1 : stronglyNormalizing (rule+ rule))
-                    (pr2 : weaklyConfluent rule)
-                    (t1 : rule x y)
-                    (t2 : (rule+ rule) x z)
-        : TruncP (\Sigma (t : A)
-                         ((rule* rule) y t)
-                         ((rule* rule) z t))
-        | A, rule, x, y, z, pr1, pr2, t, base r => pr2 x y z (t, r)
-        | A, rule, x, y, z, pr1, pr2, t, cons ux ut ur => {?}
-
-      -- _help3 A rule x1 y z pr1 pr2 {?} r
-      -- _help3 A rule x y x1 pr1 pr2 t1 t -- Notebook
-
-      -- accREL (f : \Pi (b : A) -> (rel b a) -> acc rel b)
-
-      -- | A, rule, x, y, z, pr1, pr2, t1, base r => pr2 x y z (t1, r)
-
-      -- pr2 :
-      -- \Pi (x : A) ->
-      --        \Pi (y z : A) ->
-      --            \Sigma (rule x y) (rule x z) ->
-      --            TruncP (\Sigma (t : A)
-      --                           (rule* rule y t)
-      --                           (rule* rule z t))
-      -- pr2 x y uux (uur, {?)
-
-      --          f x y z (acc.ind
-      --                       (rule* rule)
-      --                       x
-      --                       (\lam (a : A) => \lam (u : acc (rule* rule) a) => rule a y)
-      --                       (\lam q1 q2 q3 => q3 q1 (byRight idp))
-      --                       x (pr1 x),
-      --                   acc.ind
-      --                       (rule* rule)
-      --                       x
-      --                       (\lam (a : A) => \lam (u : acc (rule* rule) a) => rule a z)
-      --                       (\lam q1 q2 q3 => q3 q1 (byRight idp))
-      --                       x (pr1 x))
+                         (ReflexiveTransitiveClosure.RTC rule y t)
+                         (ReflexiveTransitiveClosure.RTC rule z t))
+        | rule, x, y, z, pr1, pr2, ReflexiveTransitiveClosure.base r, ReflexiveTransitiveClosure.base r1 =>
+          inP (x, ReflexiveTransitiveClosure.base (inv r), ReflexiveTransitiveClosure.base (inv r1))
+        | rule, x, y, z, Wellfounded.accREL f, pr2, ReflexiveTransitiveClosure.base r, r1 =>
+          inP (z, transport (\lam v => ReflexiveTransitiveClosure.RTC rule v z) r r1, ReflexiveTransitiveClosure.base idp)
+        | rule, x, y, z, Wellfounded.accREL f, pr2, r, ReflexiveTransitiveClosure.base r1 =>
+          inP (y, ReflexiveTransitiveClosure.base idp, transport (\lam v => ReflexiveTransitiveClosure.RTC rule v y) r1 r)
+        | rule, x, y, z, Wellfounded.accREL f, pr2, ReflexiveTransitiveClosure.cons x1 t1 r1, ReflexiveTransitiveClosure.cons x2 t2 r2 =>
+          \let
+            | wcrProp => pr2 x x1 x2 (t1, t2)
+          \in \scase wcrProp \with {
+            | inP wcr =>
+              \let
+                | innerPoint => wcr.1
+                | lSide => wcr.2
+                | rSide => wcr.3
+                | ind1Prop => _help2 rule x1 y innerPoint (f x1 (TransitiveClosure.base (op t1))) pr2 r1 lSide
+              \in \scase ind1Prop \with {
+                | inP ind1 =>
+                  \let
+                    | innerPoint' => ind1.1
+                    | lSide' => ind1.2
+                    | rSide' => ind1.3
+                    | ind2Prop => _help2 rule x2 innerPoint' z (f x2 (TransitiveClosure.base (op t2))) pr2 (ReflexiveTransitiveClosure.concat rule x2 innerPoint innerPoint' rSide rSide') r2
+                  \in \scase ind2Prop \with {
+                    | inP ind2 => inP (ind2.1, ReflexiveTransitiveClosure.concat rule y innerPoint' ind2.1 lSide' ind2.2, ind2.3)
+                  }
+              }
+          }
     }
 }
 
