@@ -129,10 +129,15 @@
       }
   }
 
-  -- TODO: rewrite with inductive definition
-
   \module SymmetricClosure \where {
     \open Base
+
+    \truncated \data SC {A : \Set}
+                        (rel : relation A)
+                        (a b : A)
+    : \Prop
+      | base (r : rel a b)
+      | flip (r : SC rel b a)
 
     \func symmetricClosure {A : \Set}
                            (rel : relation A)
@@ -145,14 +150,12 @@
         \func constructor {A : \Set}
                           (r : relation A)
           : relation A =>
-          union r (inverse r)
+          SC r
 
         \func _symmetric {A : \Set}
                          (r : relation A)
           : symmetric (constructor r) =>
-          \lam (x y : A) => ||.rec Path.inProp
-                                   byRight
-                                   byLeft
+          \lam (x y : A) => flip
 
         \func _inclusion {A : \Set}
                          (rel : relation A)
@@ -160,13 +163,18 @@
                          (i1 : inclusion rel p)
                          (pr : symmetric p)
           : inclusion (constructor rel) p
-          | rel, p, i1, pr =>
-            \lam x y =>
-                \lam q =>
-                    \case q \with {
-                      | byLeft (t1 : rel x y) => i1 x y t1
-                      | byRight (t2 : rel y x) => pr y x (i1 y x t2)
-                    }
+          | rel, p, i1, pr => _help rel p i1 pr
+          \where
+            \func _help {A : \Set}
+                        (rel : relation A)
+                        (p : relation A)
+                        (i1 : inclusion rel p)
+                        (pr : symmetric p)
+                        (x y : A)
+                        (r : SC rel x y)
+              : p x y
+              | rel, p, i1, pr, x, y, base r => i1 x y r
+              | rel, p, i1, pr, x, y, flip r => pr y x (_help rel p i1 pr y x r)
       }
   }
 
@@ -386,7 +394,7 @@
                      (r : TransitiveClosure.TC rel a b)
       : ReflexiveTransitiveClosure.RTC rel a b
       | rel, a, b, TransitiveClosure.TC.base r =>
-        ReflexiveTransitiveClosure.RTC.cons b r (ReflexiveTransitiveClosure.RTC.base idp : ReflexiveTransitiveClosure.RTC rel b b)
+        ReflexiveTransitiveClosure.RTC.cons b r (ReflexiveTransitiveClosure.RTC.base idp)
       | rel, a, b, TransitiveClosure.TC.cons x t r =>
         ReflexiveTransitiveClosure.RTC.cons x t (plusToStar rel x b r)
 
@@ -400,6 +408,16 @@
         transport (\lam v => TransitiveClosure.TC rel a v) r (TransitiveClosure.TC.base p)
       | rel, a, b, c, p, ReflexiveTransitiveClosure.RTC.cons x t r =>
         TransitiveClosure.TC.cons b p (starToPlus rel b x c t r)
+
+    \func starIdempotent  {A : \Set}
+                          (rel : relation A)
+                          (a b : A)
+                          (r : ReflexiveTransitiveClosure.RTC (ReflexiveTransitiveClosure.RTC rel) a b)
+      : ReflexiveTransitiveClosure.RTC rel a b
+      | rel, a, b, ReflexiveTransitiveClosure.base r' =>
+        ReflexiveTransitiveClosure.RTC.base r'
+      | rel, a, b, ReflexiveTransitiveClosure.cons x' t' r' =>
+        ReflexiveTransitiveClosure.concat rel a x' b t' (starIdempotent rel x' b r')
   }
 
   \module Wellfounded \where {
@@ -408,14 +426,14 @@
     \data acc {A : \Set}
               (rel : relation A)
               (a : A)
-    : \Type
+    : \Prop
       | accREL (f : \Pi (b : A) -> rel b a -> acc rel b)
       \where
         \func ind {A : \Set}
                   {rel : relation A}
                   (P : \Pi (a : A) -> acc rel a -> \Type)
                   (f : \Pi (a : A) ->
-                      \Pi (h : \Pi (b : A) -> (rel b a) -> acc rel b) ->
+                      \Pi (h : \Pi (b : A) -> rel b a -> acc rel b) ->
                           (\Pi (b : A) -> \Pi (l : rel b a) -> P b (h b l)) ->
                           P a (accREL h))
                   (a : A)
@@ -423,50 +441,6 @@
           : P a c
           |  P, f, a, (accREL h) =>
             f a h (\lam b => \lam l => ind P f b (h b l))
-
-    \func isProp (A : \Set)
-                 (rel : relation A)
-                 (a : A)
-                 (s1 s2 : acc rel a)
-      : s1 = s2
-      | A, rel, a, p1, p2 =>
-        \let
-          | P1 : \Pi (a : A) -> \Pi (s1 : acc rel a) -> \Type =>
-            \lam (a' : A) =>
-                \lam (s1' : acc rel a') =>
-                    \Pi (s2' : acc rel a') -> s1' = s2'
-
-          | P2 : \Pi (a : A) -> \Pi (s2 : acc rel a) -> \Type =>
-            \lam (a : A) => \lam (s2 : acc rel a) => \Pi (a : A) -> \Pi (h : \Pi (b : A) -> rel b a -> acc rel b) ->
-                \Pi (k : \Pi (b : A) -> \Pi (l : rel b a) -> \Pi (s2 : acc rel b) -> h b l = s2) ->
-                    \Pi (s2 : acc rel a) -> accREL h = s2
-
-          | P2_term
-          : \Pi (a : A) ->
-              \Pi (s2 : acc rel a) ->
-                  P2 a s2 =>
-            \lam (a : A) =>
-                \lam (s2 : acc rel a) =>
-                    acc.ind
-                        P2
-                        (\lam (a : A) =>
-                            \lam (h2 : \Pi (b : A) -> rel b a -> acc rel b) =>
-                                \lam (k2 : \Pi (b : A) -> rel b a -> \Pi (a : A) -> \Pi (h1 : \Pi (b : A) -> rel b a -> acc rel b) ->
-                                    (\Pi (b : A) -> \Pi (l : rel b a) -> \Pi (s2 : acc rel b) -> h1 b l = s2) ->
-                                    \Pi (s2 : acc rel a) -> accREL h1 = s2) =>
-                                    \lam (a : A) =>
-                                        \lam (h1 : \Pi (b : A) -> rel b a -> acc rel b) =>
-                                            \lam (k1 : \Pi (b : A) -> \Pi (l : rel b a) -> \Pi (s2 : acc rel b) -> h1 b l = s2) =>
-                                                \lam (s : acc rel a) => k2 a {?} a h1 k1 s)
-                        a
-                        s2
-        \in
-          (acc.ind
-              P1
-              (P2_term a p2)
-              a
-              p1)
-              p2
 
     \func wellFounded {A : \Set}
                       (rel : relation A)
@@ -518,31 +492,15 @@
     : relation A =>
     ReflexiveTransitiveClosure.reflexiveTransitiveClosure.constructor rule
 
+  \func rule<->* {A : \Set}
+                 (rule : relation A)
+    : relation A =>
+    ReflexiveSymmetricTransitiveClosure.reflexiveSymmetricTransitiveClosure.constructor rule
+
   \func rule+ {A : \Set}
               (rule : relation A)
     : relation A =>
     TransitiveClosure.transitiveClosure.constructor rule
-
-  -- TODO: revisit spans and rewrite important definitions using them
-  --  \func span {A : \Set}
-  --             (r : relation A)
-  --    : \Type =>
-  --    \Sigma (x : A) (y : A) (z : A) (r x y) (r x z)
-  --
---  \func cospan {A : \Set}
-  --                (r : relation A)
-  --    : \Type =>
-  --    \Sigma (x : A) (y : A) (z : A) (r y x) (r z x)
-  --
---  \func extended-span {A : \Set}
-  --                      (r : relation A)
-  --    : \Type =>
-  --    \Sigma (x : A) (y : A) (z : A) (rule* r x y) (rule* r x z)
-  --
---  \func extended-cospan {A : \Set}
-  --                         (r : relation A)
-  --    : \Type =>
-  --    \Sigma (x : A) (y : A) (z : A) (rule* r y x) (rule* r z x)
 
   \func stronglyNormalizing {A : \Set}
                             (rule : relation A)
@@ -564,6 +522,25 @@
                        (rule* rule x y)
                        (isNormalForm rule y))
 
+  \func normalForm {A : \Set}
+                   (rule : relation A)
+    : \Prop =>
+    \Pi (a : A) ->
+        \Pi (b : A) ->
+            isNormalForm rule a ->
+            rule<->* rule a b ->
+            rule* rule b a
+
+  \func uniqueNormalForm {A : \Set}
+                         (rule : relation A)
+    : \Prop =>
+    \Pi (a : A) ->
+        \Pi (b : A) ->
+            isNormalForm rule a ->
+            isNormalForm rule b ->
+            rule<->* rule a b ->
+            a = b
+
   \func weaklyNormalizing {A : \Set}
                           (rule : relation A)
     : \Prop =>
@@ -579,7 +556,8 @@
                        (rule* rule z t))
 
   \func confluent {A : \Set}
-                  (rule : relation A) : \Prop =>
+                  (rule : relation A)
+    : \Prop =>
     \Pi (x y z : A) ->
         \Sigma (rule* rule x y) (rule* rule x z) ->
         TruncP (\Sigma (t : A)
@@ -595,6 +573,36 @@
                 c x y z
                   ((ReflexiveTransitiveClosure.cons y p.1 (ReflexiveTransitiveClosure.base idp)),
                    (ReflexiveTransitiveClosure.cons z p.2 (ReflexiveTransitiveClosure.base idp)))
+
+  \func confluent->confluent* {A : \Set}
+                              (rule : relation A)
+                              (c : confluent rule)
+    : confluent (rule* rule) =>
+    \lam (x y z : A) =>
+        \lam (p : \Sigma (rule* (rule* rule) x y) (rule* (rule* rule) x z)) =>
+            \scase c x y z (tupleMap (starIdempotent rule x y) (starIdempotent rule x z) p) \with {
+              | inP a =>
+                inP (a.1,
+                     ReflexiveTransitiveClosure.cons a.1 a.2 (ReflexiveTransitiveClosure.base idp),
+                     ReflexiveTransitiveClosure.cons a.1 a.3 (ReflexiveTransitiveClosure.base idp))
+            }
+
+  \func confluent->weaklyConfluent* {A : \Set}
+                                    (rule : relation A)
+    : confluent rule -> weaklyConfluent (rule* rule) =>
+    \lam c => confluent->weaklyConfluent (rule* rule) (confluent->confluent* rule c)
+
+  \func confluent*->confluent {A : \Set}
+                              (rule : relation A)
+                              (c : confluent (rule* rule))
+    : confluent rule =>
+    \lam (x y z : A) =>
+        \lam (p : \Sigma (rule* rule x y) (rule* rule x z)) =>
+            \scase c x y z (tupleMap
+                (\lam q => ReflexiveTransitiveClosure.cons y q (ReflexiveTransitiveClosure.base idp))
+                (\lam q => ReflexiveTransitiveClosure.cons z q (ReflexiveTransitiveClosure.base idp)) p) \with {
+              | inP a => inP (a.1, starIdempotent rule y a.1 a.2, starIdempotent rule z a.1 a.3)
+            }
 
   \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : relation A)
                                                         (pr1 : stronglyNormalizing rule)
@@ -621,10 +629,16 @@
         | rule, x, y, z, pr1, pr2, ReflexiveTransitiveClosure.base r, ReflexiveTransitiveClosure.base r1 =>
           inP (x, ReflexiveTransitiveClosure.base (inv r), ReflexiveTransitiveClosure.base (inv r1))
         | rule, x, y, z, Wellfounded.accREL f, pr2, ReflexiveTransitiveClosure.base r, r1 =>
-          inP (z, transport (\lam v => ReflexiveTransitiveClosure.RTC rule v z) r r1, ReflexiveTransitiveClosure.base idp)
+          inP (z,
+               transport (\lam v => ReflexiveTransitiveClosure.RTC rule v z) r r1,
+               ReflexiveTransitiveClosure.base idp)
         | rule, x, y, z, Wellfounded.accREL f, pr2, r, ReflexiveTransitiveClosure.base r1 =>
-          inP (y, ReflexiveTransitiveClosure.base idp, transport (\lam v => ReflexiveTransitiveClosure.RTC rule v y) r1 r)
-        | rule, x, y, z, Wellfounded.accREL f, pr2, ReflexiveTransitiveClosure.cons x1 t1 r1, ReflexiveTransitiveClosure.cons x2 t2 r2 =>
+          inP (y,
+               ReflexiveTransitiveClosure.base idp,
+               transport (\lam v => ReflexiveTransitiveClosure.RTC rule v y) r1 r)
+        | rule, x, y, z, Wellfounded.accREL f, pr2,
+        ReflexiveTransitiveClosure.cons x1 t1 r1,
+        ReflexiveTransitiveClosure.cons x2 t2 r2 =>
           \let
             | wcrProp => pr2 x x1 x2 (t1, t2)
           \in \scase wcrProp \with {
@@ -633,16 +647,26 @@
                 | innerPoint => wcr.1
                 | lSide => wcr.2
                 | rSide => wcr.3
-                | ind1Prop => _help2 rule x1 y innerPoint (f x1 (TransitiveClosure.base (op t1))) pr2 r1 lSide
+                | ind1Prop => _help2 rule x1 y innerPoint
+                                     (f x1 (TransitiveClosure.base (op t1))) pr2 r1 lSide
               \in \scase ind1Prop \with {
                 | inP ind1 =>
                   \let
                     | innerPoint' => ind1.1
                     | lSide' => ind1.2
                     | rSide' => ind1.3
-                    | ind2Prop => _help2 rule x2 innerPoint' z (f x2 (TransitiveClosure.base (op t2))) pr2 (ReflexiveTransitiveClosure.concat rule x2 innerPoint innerPoint' rSide rSide') r2
+                    | ind2Prop => _help2 rule
+                                         x2
+                                         innerPoint'
+                                         z
+                                         (f x2 (TransitiveClosure.base (op t2)))
+                                         pr2
+                                         (ReflexiveTransitiveClosure.concat rule x2 innerPoint innerPoint' rSide rSide')
+                                         r2
                   \in \scase ind2Prop \with {
-                    | inP ind2 => inP (ind2.1, ReflexiveTransitiveClosure.concat rule y innerPoint' ind2.1 lSide' ind2.2, ind2.3)
+                    | inP ind2 => inP (ind2.1,
+                                       ReflexiveTransitiveClosure.concat rule y innerPoint' ind2.1 lSide' ind2.2,
+                                       ind2.3)
                   }
               }
           }
