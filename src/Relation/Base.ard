@@ -1,3 +1,4 @@
+\import Equiv
 \import Function
 \import Logic
 \import Paths
@@ -92,6 +93,13 @@
   \module ReflexiveClosure \where {
     \open Base
 
+    \truncated \data RC {A : \Set}
+                        (rel : relation A)
+                        (a b : A)
+    : \Prop
+      | base (r : rel a b)
+      | refl (r : a = b)
+
     \func reflexiveClosure {A : \Set}
                            (rel : relation A)
       : closure rel reflexive constructor =>
@@ -103,12 +111,12 @@
         \func constructor {A : \Set}
                           (r : relation A)
           : relation A =>
-          union r (=)
+          RC r
 
         \func _reflexive {A : \Set}
                          (r : relation A)
           : reflexive (constructor r) =>
-          \lam _ => byRight idp
+          \lam _ => refl idp
 
         \func _inclusion {A : \Set}
                          (rel : relation A)
@@ -120,11 +128,11 @@
             \lam x y =>
                 \lam u =>
                     \case u \with {
-                      | byLeft a => i1 x y a
-                      | byRight b => coe2 (@ (pmap2 p idp b))
-                                          left
-                                          (pr x)
-                                          right
+                      | base r => i1 x y r
+                      | refl r => coe2 (@ (pmap2 p idp r))
+                                       left
+                                       (pr x)
+                                       right
                     }
       }
   }
@@ -320,10 +328,11 @@
                           (rel : relation A)
                           (a b : A)
     : \Prop
-      | step (r : rel a b)
       | refl (p : a = b)
-      | flip (t : RSTC rel b a)
-      | cons (x : A) (t : (RSTC rel) a x) (r : (RSTC rel) x b)
+      | fwd (r : rel a b)
+      | bwd (r : rel b a)
+      | fwdc {q : A} (t : rel a q) (r : RSTC rel q b)
+      | bwdc {q : A} (t : rel q a) (r : RSTC rel q b)
 
     \func reflexiveSymmetricTransitiveClosure {A : \Set}
                                               (rel : relation A)
@@ -345,7 +354,7 @@
                           (x y z : A)
                           (p1 : constructor r x y)
                           (p2 : constructor r y z)
-          : constructor r x z => cons y p1 p2
+          : constructor r x z => concat r x y z p1 p2
 
         \func _reflexive {A : \Set} (r : relation A)
           : \Pi (x : A) ->
@@ -353,11 +362,14 @@
           \lam (x : A) => refl idp
 
         \func _symmetric {A : \Set} (r : relation A)
-          : \Pi (x y : A) ->
-            (constructor r) x y ->
-            (constructor r) y x =>
-          \lam (x y : A) =>
-              \lam (p : RSTC r x y) => flip p
+                         (x y : A)
+                         (p : (constructor r) x y)
+          : (constructor r) y x
+          | rel, x, y, refl p => refl (inv p)
+          | rel, x, y, fwd r => bwd r
+          | rel, x, y, bwd r => fwd r
+          | rel, x, y, fwdc t r => concat rel _ _ _ (_symmetric rel _ y r) (bwd t)
+          | rel, x, y, bwdc t r => concat rel _ _ _ (_symmetric rel _ y r) (fwd t)
 
         \func _inclusion {A : \Set}
                          (rel : relation A)
@@ -367,14 +379,15 @@
                          (x y : A)
                          (t : (constructor rel) x y)
           : p x y
-          | rel, p, i1, pr, x, y, step r => i1 x y r
           | rel, p, i1, pr, x, y, refl p1 => coe2
               (@ (pmap2 p idp p1))
               left
               (pr.2 x)
               right
-          | rel, p, i1, pr, x, y, flip t => pr.3 y x (_inclusion rel p i1 pr y x t)
-          | rel, p, i1, pr, x, y, cons x1 t r => pr.1 x x1 y (_inclusion rel p i1 pr x x1 t) (_inclusion rel p i1 pr x1 y r)
+          | rel, p, i1, pr, x, y, fwd r => i1 x y r
+          | rel, p, i1, pr, x, y, bwd r => pr.3 y x (i1 y x r)
+          | rel, p, i1, pr, x, y, fwdc t r => pr.1 _ _ _ (i1 _ _ t) (_inclusion rel p i1 pr _ y r)
+          | rel, p, i1, pr, x, y, bwdc t r => pr.1 _ _ _ (pr.3 _ _ (i1 _ _ t)) (_inclusion rel p i1 pr _ y r)
       }
 
     \func concat {A : \Set}
@@ -382,7 +395,14 @@
                  (a b c : A)
                  (r1 : RSTC rel a b)
                  (r2 : RSTC rel b c)
-      : RSTC rel a c => cons b r1 r2
+      : RSTC rel a c
+      | rel, a, b, c, refl p, refl p1 => refl (p *> p1)
+      | rel, a, b, c, refl p, r => transport (\lam v => RSTC rel v c) (inv p) r
+      | rel, a, b, c, r, refl p => transport (\lam v => RSTC rel a v) p r
+      | rel, a, b, c, fwd r, t => fwdc r t
+      | rel, a, b, c, bwd r, t => bwdc r t
+      | rel, a, b, c, fwdc t r, r2 => fwdc t (concat rel _ b c r r2)
+      | rel, a, b, c, bwdc t r, r2 => bwdc t (concat rel _ b c r r2)
   }
 
   \module Utils \where {
@@ -509,37 +529,35 @@
 
   \func isNormalForm {A : \Set}
                      (rule : relation A)
-    : A -> \Prop =>
-    \lam (x : A) =>
-        Not (\Sigma (y : A)
-                    (rule x y))
+                     (x : A)
+    : \Prop =>
+    Not (\Sigma (y : A)
+                (rule x y))
 
   \func hasNormalForm {A : \Set}
                       (rule : relation A)
-    : A -> \Prop =>
-    \lam (x : A) =>
-        TruncP (\Sigma (y : A)
-                       (rule* rule x y)
-                       (isNormalForm rule y))
+                      (x : A)
+    : \Prop =>
+    TruncP (\Sigma (y : A)
+                   (rule* rule x y)
+                   (isNormalForm rule y))
 
   \func normalForm {A : \Set}
                    (rule : relation A)
     : \Prop =>
-    \Pi (a : A) ->
-        \Pi (b : A) ->
-            isNormalForm rule a ->
-            rule<->* rule a b ->
-            rule* rule b a
+    \Pi (a b : A) ->
+        isNormalForm rule a ->
+        rule<->* rule a b ->
+        rule* rule b a
 
   \func uniqueNormalForm {A : \Set}
                          (rule : relation A)
     : \Prop =>
-    \Pi (a : A) ->
-        \Pi (b : A) ->
-            isNormalForm rule a ->
-            isNormalForm rule b ->
-            rule<->* rule a b ->
-            a = b
+    \Pi (a b : A) ->
+        isNormalForm rule a ->
+        isNormalForm rule b ->
+        rule<->* rule a b ->
+        a = b
 
   \func weaklyNormalizing {A : \Set}
                           (rule : relation A)
@@ -603,6 +621,85 @@
                 (\lam q => ReflexiveTransitiveClosure.cons z q (ReflexiveTransitiveClosure.base idp)) p) \with {
               | inP a => inP (a.1, starIdempotent rule y a.1 a.2, starIdempotent rule z a.1 a.3)
             }
+
+  \func confluent->normalForm {A : \Set}
+                              (rule : relation A)
+                              (c : confluent rule)
+    : normalForm rule =>
+    \lam (x y : A) =>
+        \lam (n : isNormalForm rule x) =>
+            \lam (p : rule<->* rule x y) =>
+                _help rule c x y n
+                      (ReflexiveSymmetricTransitiveClosure.reflexiveSymmetricTransitiveClosure._symmetric rule _ _ p)
+    \where
+      \sfunc _help {A : \Set}
+                   (rule : relation A)
+                   (c : confluent rule)
+                   (x y : A)
+                   (n : isNormalForm rule x)
+                   (p : rule<->* rule y x)
+        : rule* rule y x
+        | rule, c, x, y, n, ReflexiveSymmetricTransitiveClosure.refl p =>
+          ReflexiveTransitiveClosure.base p
+        | rule, c, x, y, n, ReflexiveSymmetricTransitiveClosure.fwd r =>
+          ReflexiveTransitiveClosure.cons _ r (ReflexiveTransitiveClosure.base idp)
+        | rule, c, x, y, n, ReflexiveSymmetricTransitiveClosure.bwd r =>
+          absurd (n (_, r))
+        | rule, c, x, y, n, ReflexiveSymmetricTransitiveClosure.fwdc t r =>
+          \let
+            | rec => _help rule c _ _ n r
+          \in ReflexiveTransitiveClosure.cons _ t rec
+        | rule, c, x, y, n, ReflexiveSymmetricTransitiveClosure.bwdc t r =>
+          \let
+            | rec => _help rule c _ _ n r
+            | conf => c _ _ _
+                        ((ReflexiveTransitiveClosure.cons _ t (ReflexiveTransitiveClosure.base idp)), rec)
+          \in \scase conf \with {
+            | inP conf' => \case conf'.3 \with {
+              | ReflexiveTransitiveClosure.base r' => transport
+                  (\lam v => ReflexiveTransitiveClosure.RTC rule y v)
+                  (inv r')
+                  conf'.2
+              | ReflexiveTransitiveClosure.cons x' t' r' => absurd (n (_, t'))
+            }
+          }
+
+  \func confluent->uniqueNormalForm {A : \Set}
+                                    (rule : relation A)
+                                    (c : confluent rule)
+    : uniqueNormalForm rule =>
+    \lam (x y : A) =>
+        \lam (n1 : isNormalForm rule x) =>
+            \lam (n2 :  isNormalForm rule y) =>
+                \lam (p : rule<->* rule x y) => _help rule c (confluent->normalForm rule c) x y n1 n2 p
+    \where
+      \sfunc _help {A : \Set}
+                   (rule : relation A)
+                   (c : confluent rule)
+                   (n : normalForm rule)
+                   (x y : A)
+                   (n1 : isNormalForm rule x)
+                   (n2 :  isNormalForm rule y)
+                   (p : rule<->* rule x y)
+        : x = y
+        | rule, c, n, x, y, n1, n2, ReflexiveSymmetricTransitiveClosure.refl p => p
+        | rule, c, n, x, y, n1, n2, ReflexiveSymmetricTransitiveClosure.fwd r => absurd (n1 (y, r))
+        | rule, c, n, x, y, n1, n2, ReflexiveSymmetricTransitiveClosure.bwd r => absurd (n2 (x, r))
+        | rule, c, n, x, y, n1, n2, ReflexiveSymmetricTransitiveClosure.fwdc t r => absurd (n1 (_, t))
+        | rule, c, n, x, y, n1, n2, ReflexiveSymmetricTransitiveClosure.bwdc t r =>
+          \let
+            | nf1 => n _ _ n2
+                       (ReflexiveSymmetricTransitiveClosure.reflexiveSymmetricTransitiveClosure._symmetric rule _ _ r)
+            | nf2 => n _ _ n1
+                       (ReflexiveSymmetricTransitiveClosure.bwd t)
+            | conf => c _ _ _ (nf1, nf2)
+          \in \scase conf \with {
+            | inP conf' => \case conf'.2, conf'.3 \with {
+              | ReflexiveTransitiveClosure.base r1, ReflexiveTransitiveClosure.base r2 => r2 *> (inv r1)
+              | _, ReflexiveTransitiveClosure.cons x2 t2 r2 => absurd (n1 (_, t2))
+              | ReflexiveTransitiveClosure.cons x1 t1 r1, _ => absurd (n2 (_, t1))
+            }
+          }
 
   \func stronglyNormalizing&&weaklyConfluent->confluent {A : \Set} (rule : relation A)
                                                         (pr1 : stronglyNormalizing rule)
